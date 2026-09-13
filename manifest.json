@@ -1,6 +1,6 @@
 {
-  "name": "Dashboard Omset LBP B259",
-  "short_name": "Dashboard B259",
+  "name": "Tools Monitoring Cipta Niaga Semesta",
+  "short_name": "Monitoring CNS",
   "description": "Dashboard monitoring omset, distribusi, warehouse, dan utilisasi armada — CNS Padang Sidempuan",
   "start_url": "./index.html",
   "scope": "./",

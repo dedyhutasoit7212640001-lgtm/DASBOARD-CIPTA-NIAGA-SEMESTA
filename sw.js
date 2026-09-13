@@ -6,15 +6,15 @@ const CACHE_NAME = "dashboard-b259-v1";
 const CORE_FILES = [
   "./index.html",
   "./manifest.json",
-  "./pwa_icons/icon-72.png",
-  "./pwa_icons/icon-96.png",
-  "./pwa_icons/icon-128.png",
-  "./pwa_icons/icon-144.png",
-  "./pwa_icons/icon-152.png",
-  "./pwa_icons/icon-180.png",
-  "./pwa_icons/icon-192.png",
-  "./pwa_icons/icon-384.png",
-  "./pwa_icons/icon-512.png"
+  "./icon-72.png",
+  "./icon-96.png",
+  "./icon-128.png",
+  "./icon-144.png",
+  "./icon-152.png",
+  "./icon-180.png",
+  "./icon-192.png",
+  "./icon-384.png",
+  "./icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {

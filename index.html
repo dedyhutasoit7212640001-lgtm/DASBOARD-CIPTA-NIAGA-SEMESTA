@@ -14,9 +14,6 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <script>
-  // Daftarkan service worker supaya app bisa dibuka offline setelah
-  // pertama kali diinstal/dibuka online. Dibungkus try/catch dan cek
-  // ketersediaan API supaya tidak error di browser lama/file:// lokal.
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("sw.js").catch((err) => console.warn("SW gagal daftar:", err));
@@ -3608,6 +3605,9 @@
       <div class="reasons" id="sendingSalesmanList"></div>
     </div>
 
+    <!-- ===== Rata-rata Scan Out/In, Toko Terakhir, Lama Bekerja ===== -->
+    <div class="grid grid-kpi" id="sendingAvgKpiRow" style="margin-bottom:16px;"></div>
+
     <!-- ===== Grafik Sales Prestasi Terbaik ===== -->
     <div class="card chart-card" data-chart-id="sendingBestChart" data-chart-title="Prestasi Sending - Sales Prestasi Terbaik" style="margin-bottom:16px;">
       <div class="card-top">
@@ -3621,14 +3621,24 @@
     <div class="top5-grid" style="margin-bottom:16px;">
       <div class="card">
         <h3>🏆 5 Terbaik</h3>
-        <div class="desc">Total Sending (jam/hari) tertinggi, pada periode &amp; filter yang aktif saat ini</div>
+        <div class="desc">Skor kedisiplinan: Total Sending + kelengkapan 89ZIP/99ZIP (jam sending teratur, total terbanyak, RNSH lengkap)</div>
         <div id="sendingTop5Wrap" class="top5-list"></div>
       </div>
       <div class="card">
         <h3>⚠️ 5 Terbawah</h3>
-        <div class="desc">Total Sending (jam/hari) terendah, pada periode &amp; filter yang aktif saat ini</div>
+        <div class="desc">Skor kedisiplinan terendah — jam sending jarang/tidak teratur dan/atau 89ZIP/99ZIP tidak lengkap</div>
         <div id="sendingBottom5Wrap" class="top5-list"></div>
       </div>
+    </div>
+
+    <!-- ===== Sales Perlu Perhatian (sendingan paling sering kosong) ===== -->
+    <div class="card chart-card" data-chart-id="sendingWorstWrap" data-chart-title="Prestasi Sending - Sales Perlu Perhatian" style="margin-bottom:16px;">
+      <div id="chart-sendingWorstWrap" style="display:none;"></div>
+      <div class="card-top">
+        <div class="titles"><h3>🔴 Sales Perlu Perhatian</h3><div class="desc">10 salesman dengan jam sending paling sering kosong (merah), diurutkan dari terbanyak — RNSH 89ZIP/99ZIP yang tidak masuk juga ditandai</div></div>
+      </div>
+      <div class="table-export-row"><button class="table-export-btn" data-export-table="sendingWorstWrap" data-export-name="PrestasiSending_PerluPerhatian">⬇️ Excel</button></div>
+      <div id="sendingWorstWrap" style="max-height:420px; overflow:auto; margin-top:8px;"></div>
     </div>
 
     <!-- ===== Laporan Prestasi Sending Salesman (siap cetak) ===== -->
@@ -3941,6 +3951,24 @@
         </div>
         <div class="table-export-row"><button class="table-export-btn" data-export-table="eroReasonDetailWrap" data-export-name="EdiRO_BreakdownAlasan_Detail">⬇️ Excel</button></div>
         <div id="eroReasonDetailWrap" style="max-height:600px; overflow:auto; margin-top:8px;"></div>
+      </div>
+
+      <!-- ===== 10 PCode Fast Moving & Non-Fast Moving ===== -->
+      <div class="grid grid-2" style="gap:16px; margin-bottom:16px;">
+        <div class="card chart-card" data-chart-id="eroFastMovingChart" data-chart-title="EDI RO - 10 PCode Fast Moving">
+          <div class="card-top">
+            <div class="titles"><h3>🚀 10 PCode Fast Moving</h3><div class="desc">Qty karton (ORGQTY/CONVUNIT3) terbanyak dari order berstatus Terkirim, pada periode terfilter</div></div>
+            <div class="tools"><label class="val-toggle"><input type="checkbox" data-values-target="eroFastMovingChart" checked><span>🔢 Nilai</span></label></div>
+          </div>
+          <div class="chart-canvas-wrap" style="height:360px;"><canvas id="chart-eroFastMovingChart"></canvas></div>
+        </div>
+        <div class="card chart-card" data-chart-id="eroNonFastMovingChart" data-chart-title="EDI RO - 10 PCode Non-Fast Moving">
+          <div class="card-top">
+            <div class="titles"><h3>🐢 10 PCode Non-Fast Moving</h3><div class="desc">Qty karton tersedikit dari order berstatus Terkirim, pada periode terfilter</div></div>
+            <div class="tools"><label class="val-toggle"><input type="checkbox" data-values-target="eroNonFastMovingChart" checked><span>🔢 Nilai</span></label></div>
+          </div>
+          <div class="chart-canvas-wrap" style="height:360px;"><canvas id="chart-eroNonFastMovingChart"></canvas></div>
+        </div>
       </div>
 
       <!-- ===== Cari PCode -- siapa saja yang order produk tertentu ===== -->
@@ -6772,6 +6800,29 @@ function ediRoPcodeSearchResults() {
     (r.pcodeName && r.pcodeName.toLowerCase().includes(q))
   );
 }
+/* Fast Moving / Non-Fast Moving -- 10 PCode dgn Qty Karton (ORGQTY/
+   CONVUNIT3, rumus SAMA dgn Bad Stock "stock terbatas") TERBANYAK vs
+   TERSEDIKIT, dihitung HANYA dari baris yg berhasil TERKIRIM (STATUS="1")
+   pada periode terfilter. PCode yg gagal/batal (status != "1") tidak
+   ikut dihitung sama sekali di kedua daftar ini -- baik Fast maupun
+   Non-Fast Moving sama-sama mengukur produk yg SUDAH terkirim, hanya
+   beda banyak-sedikitnya volume. */
+function ediRoFastMoving() {
+  const rows = fEdiRo().filter(r => r.status === "1");
+  const map = new Map();
+  rows.forEach(r => {
+    const key = r.pcode;
+    if (!key) return;
+    if (!map.has(key)) map.set(key, { pcode: r.pcode, pcodeName: r.pcodeName, karton: 0, nOrder: 0 });
+    const o = map.get(key);
+    o.karton += r.convUnit3 > 0 ? r.orgQty / r.convUnit3 : 0;
+    o.nOrder += 1;
+  });
+  const list = Array.from(map.values());
+  const fastMoving = list.slice().sort((a, b) => b.karton - a.karton).slice(0, 10);
+  const nonFastMoving = list.slice().sort((a, b) => a.karton - b.karton).slice(0, 10);
+  return { fastMoving, nonFastMoving, totalPcodeUnik: list.length };
+}
 
 /* =========================================================================
    PARSER — AGING STOCK (Excel, format wide dgn 12 kolom bulan + Under/Over)
@@ -7408,16 +7459,22 @@ function fSending() {
 const SENDING_HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17];
 /* Laporan Prestasi Sending -- SATU baris per salesman, dirata-ratakan dari
    seluruh baris (hari) pada periode filter: jam-jam (Scan Out/In, Toko
-   Pertama/Terakhir) dirata-rata sbg waktu jam; Durasi Pergi/Pulang
-   dihitung PER HARI dulu baru dirata-rata (lebih akurat drpd selisih dari
-   rata-rata gabungan). RNSH & Tertib Sending menampilkan DATA MENTAH
-   apa adanya (bukan checklist/persentase): RNSH Toko Terakhir = "89ZIP"
-   kalau FILE89 pernah terkirim pada periode terfilter, RNSH Kantor =
-   "99ZIP" kalau FILE99 pernah terkirim; kolom jam Tertib Sending
-   menampilkan JAM PENGIRIMAN SEBENARNYA pada slot jam tsb (gabung dgn "/"
-   kalau lebih dari satu hari terfilter mengirim pada jam yg sama), atau
-   kosong (ditandai merah) kalau tak pernah mengirim di jam itu. Ranking
-   dari Total Sending (rata-rata jumlah jam terisi per hari) TERTINGGI. */
+   Pertama/Terakhir) dirata-rata sbg waktu jam; Durasi Pergi/Pulang &
+   Lama Bekerja (Scan In - Scan Out) dihitung PER HARI dulu baru
+   dirata-rata (lebih akurat drpd selisih dari rata-rata gabungan). RNSH
+   & Tertib Sending menampilkan DATA MENTAH apa adanya (bukan checklist/
+   persentase): RNSH Toko Terakhir = "89ZIP" kalau FILE89 pernah terkirim
+   pada periode terfilter, RNSH Kantor = "99ZIP" kalau FILE99 pernah
+   terkirim; kolom jam Tertib Sending menampilkan JAM PENGIRIMAN
+   SEBENARNYA pada slot jam tsb (gabung dgn "/" kalau lebih dari satu
+   hari terfilter mengirim pada jam yg sama), atau kosong (ditandai
+   merah) kalau tak pernah mengirim di jam itu.
+   Ranking pakai SKOR GABUNGAN "Kedisiplinan Sending" = Total Sending
+   (rata2 jumlah jam terisi/hari, dari 9 slot) + 1 poin kalau RNSH Toko
+   Terakhir (89ZIP) pernah terkirim + 1 poin kalau RNSH Kantor (99ZIP)
+   pernah terkirim -- jadi "terbaik" = jam sending teratur/banyak DAN
+   kedua RNSH terkirim; "terendah" = sebaliknya (jarang kirim & RNSH
+   tidak lengkap), sesuai kriteria yang diminta. */
 function sendingReport() {
   const rows = fSending();
   const bySales = new Map();
@@ -7427,7 +7484,7 @@ function sendingReport() {
       bySales.set(key, {
         slsNo: r.slsNo, slsName: r.slsName, division: r.division, namaDist: r.namaDist,
         deptTimes: [], arrTimes: [], jamIns: [], jamOuts: [],
-        pergiDurs: [], pulangDurs: [],
+        pergiDurs: [], pulangDurs: [], lamaBekerjaDurs: [],
         rnshTokoEver: false, rnshKantorEver: false,
         hourTimes: SENDING_HOURS.map(() => []), totalSendPerDay: [],
         hari: 0
@@ -7440,6 +7497,7 @@ function sendingReport() {
     if (r.jamOut !== null) o.jamOuts.push(r.jamOut);
     if (r.deptTime !== null && r.jamIn !== null) o.pergiDurs.push(Math.max(0, r.jamIn - r.deptTime));
     if (r.jamOut !== null && r.arrTime !== null) o.pulangDurs.push(Math.max(0, r.arrTime - r.jamOut));
+    if (r.deptTime !== null && r.arrTime !== null) o.lamaBekerjaDurs.push(Math.max(0, r.arrTime - r.deptTime));
     if (r.rnshToko) o.rnshTokoEver = true;
     if (r.rnshKantor) o.rnshKantorEver = true;
     let dayHourCount = 0;
@@ -7451,14 +7509,20 @@ function sendingReport() {
     o.hari += 1;
   });
   const avg = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
-  const list = Array.from(bySales.values()).map(o => ({
-    slsNo: o.slsNo, slsName: o.slsName, division: o.division, namaDist: o.namaDist, hari: o.hari,
-    deptTime: avg(o.deptTimes), arrTime: avg(o.arrTimes), jamIn: avg(o.jamIns), jamOut: avg(o.jamOuts),
-    pergiDur: avg(o.pergiDurs), pulangDur: avg(o.pulangDurs),
-    rnshTokoEver: o.rnshTokoEver, rnshKantorEver: o.rnshKantorEver,
-    hourTimes: o.hourTimes,
-    totalSending: avg(o.totalSendPerDay) || 0
-  })).sort((a, b) => b.totalSending - a.totalSending);
+  const list = Array.from(bySales.values()).map(o => {
+    const totalSending = avg(o.totalSendPerDay) || 0;
+    const rnshTokoEver = o.rnshTokoEver, rnshKantorEver = o.rnshKantorEver;
+    return {
+      slsNo: o.slsNo, slsName: o.slsName, division: o.division, namaDist: o.namaDist, hari: o.hari,
+      deptTime: avg(o.deptTimes), arrTime: avg(o.arrTimes), jamIn: avg(o.jamIns), jamOut: avg(o.jamOuts),
+      pergiDur: avg(o.pergiDurs), pulangDur: avg(o.pulangDurs), lamaBekerjaDur: avg(o.lamaBekerjaDurs),
+      rnshTokoEver, rnshKantorEver,
+      hourTimes: o.hourTimes,
+      totalSending,
+      skorKedisiplinan: totalSending + (rnshTokoEver ? 1 : 0) + (rnshKantorEver ? 1 : 0),
+      jamKosong: SENDING_HOURS.length - totalSending
+    };
+  }).sort((a, b) => b.skorKedisiplinan - a.skorKedisiplinan);
   list.forEach((o, i) => { o.ranking = i + 1; });
   const total = {
     deptTime: avg(list.map(o => o.deptTime).filter(v => v !== null)),
@@ -7467,6 +7531,7 @@ function sendingReport() {
     jamOut: avg(list.map(o => o.jamOut).filter(v => v !== null)),
     pergiDur: avg(list.map(o => o.pergiDur).filter(v => v !== null)),
     pulangDur: avg(list.map(o => o.pulangDur).filter(v => v !== null)),
+    lamaBekerjaDur: avg(list.map(o => o.lamaBekerjaDur).filter(v => v !== null)),
     rnshTokoPct: list.length ? list.filter(o => o.rnshTokoEver).length / list.length : 0,
     rnshKantorPct: list.length ? list.filter(o => o.rnshKantorEver).length / list.length : 0,
     totalSending: avg(list.map(o => o.totalSending)) || 0
@@ -7479,9 +7544,8 @@ function sendingBestChart(topN = 10) {
   const top = rep.list.slice(0, topN);
   return { labels: top.map(o => o.slsName), data: top.map(o => o.totalSending) };
 }
-/* 5 Terbaik & 5 Terbawah -- mengikuti filter periode/divisi/salesman yg
-   sedang aktif (sendingReport() sudah terurut dari Total Sending
-   tertinggi). */
+/* 5 Terbaik & 5 Terbawah -- mengikuti sortir sendingReport() (skor
+   kedisiplinan: Total Sending + kelengkapan RNSH 89ZIP/99ZIP). */
 function sendingTop5Bottom5() {
   const rep = sendingReport();
   const list = rep.list;
@@ -7489,6 +7553,19 @@ function sendingTop5Bottom5() {
     top5: list.slice(0, 5),
     bottom5: list.slice(-5).reverse()
   };
+}
+/* Sales dengan sendingan PALING SERING KOSONG (jam merah/tidak terkirim
+   terbanyak) DAN RNSH (89ZIP/99ZIP) tidak masuk -- utk menyoroti siapa
+   yg paling butuh perhatian/teguran. Diurutkan dari jam kosong
+   TERBANYAK, lalu prioritaskan yg RNSH-nya juga tidak lengkap. */
+function sendingWorstAttendance(topN = 10) {
+  const rep = sendingReport();
+  return rep.list.slice().sort((a, b) => {
+    if (b.jamKosong !== a.jamKosong) return b.jamKosong - a.jamKosong;
+    const aMissing = (a.rnshTokoEver ? 0 : 1) + (a.rnshKantorEver ? 0 : 1);
+    const bMissing = (b.rnshTokoEver ? 0 : 1) + (b.rnshKantorEver ? 0 : 1);
+    return bMissing - aMissing;
+  }).slice(0, topN);
 }
 
 /* ---- RITASE (per Nopol, dari kolom RITASE = gelombang pengiriman) ---- */
@@ -10026,6 +10103,8 @@ function renderEdiRoDependent() {
   renderGenericDetail("eroOutlet");
   renderEroReasonBreakdownChart();
   renderEroReasonDetailTable();
+  renderEroFastMovingChart();
+  renderEroNonFastMovingChart();
   renderEroPcodeSearchTable();
 }
 
@@ -10128,6 +10207,48 @@ function renderEroReasonDetailTable() {
         <div class="ar-meeting-sign-label">AOS/AOM/BOM</div>
       </div>
     </div>`;
+}
+function renderEroFastMovingChart() {
+  destroyChart("eroFastMovingChart");
+  const canvasId = "chart-eroFastMovingChart";
+  const fm = ediRoFastMoving();
+  if (ensureEmptyState(canvasId, fm.fastMoving.length === 0)) return;
+  CHARTS.eroFastMovingChart = new Chart(document.getElementById(canvasId), {
+    type: "bar",
+    data: { labels: fm.fastMoving.map(o => `${o.pcode} — ${o.pcodeName}`), datasets: [{
+      label: "Qty Karton", data: fm.fastMoving.map(o => o.karton),
+      backgroundColor: CV("--accent"), borderRadius: 7
+    }] },
+    options: styledOpts({
+      indexAxis: "y",
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${fmtNum(ctx.parsed.x, 2)} karton` } } },
+      scales: {
+        x: { ticks: { color: textColor(), font: { size: 10 } }, grid: { color: gridColor() }, beginAtZero: true },
+        y: { ticks: { color: textColor(), font: { size: 9 } }, grid: { display: false } }
+      }
+    })
+  });
+}
+function renderEroNonFastMovingChart() {
+  destroyChart("eroNonFastMovingChart");
+  const canvasId = "chart-eroNonFastMovingChart";
+  const fm = ediRoFastMoving();
+  if (ensureEmptyState(canvasId, fm.nonFastMoving.length === 0)) return;
+  CHARTS.eroNonFastMovingChart = new Chart(document.getElementById(canvasId), {
+    type: "bar",
+    data: { labels: fm.nonFastMoving.map(o => `${o.pcode} — ${o.pcodeName}`), datasets: [{
+      label: "Qty Karton", data: fm.nonFastMoving.map(o => o.karton),
+      backgroundColor: "#f59e0b", borderRadius: 7
+    }] },
+    options: styledOpts({
+      indexAxis: "y",
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${fmtNum(ctx.parsed.x, 2)} karton` } } },
+      scales: {
+        x: { ticks: { color: textColor(), font: { size: 10 } }, grid: { color: gridColor() }, beginAtZero: true },
+        y: { ticks: { color: textColor(), font: { size: 9 } }, grid: { display: false } }
+      }
+    })
+  });
 }
 
 function renderEroPcodeSearchTable() {
@@ -10391,7 +10512,64 @@ function renderSendingBestChart() {
 function sendingTimeFmt(sec) { return sec === null || sec === undefined ? "-" : secToHms(sec); }
 function renderSendingTop5Bottom5() {
   const data = sendingTop5Bottom5();
-  renderTop5Bottom5Cards("sendingTop5Wrap", "sendingBottom5Wrap", data, null, o => fmtNum(o.totalSending, 1) + " jam/hari");
+  const label = o => `${fmtNum(o.skorKedisiplinan, 1)} poin (${fmtNum(o.totalSending, 1)} jam${o.rnshTokoEver ? " • 89ZIP✓" : ""}${o.rnshKantorEver ? " • 99ZIP✓" : ""})`;
+  renderTop5Bottom5Cards("sendingTop5Wrap", "sendingBottom5Wrap", data, null, label);
+}
+/* KPI ringkas: rata-rata Scan Out, Scan In, Toko Terakhir, & Lama
+   Bekerja (Scan In - Scan Out) -- ditampilkan sbg kartu terpisah yg
+   jelas terlihat, bukan hanya tersembunyi di baris SUMMARY tabel. */
+function renderSendingAvgKpiRow() {
+  const wrap = document.getElementById("sendingAvgKpiRow");
+  if (!wrap) return;
+  const rep = sendingReport();
+  const t = sendingTimeFmt;
+  wrap.innerHTML = `
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("calendar")}</div>
+      <div class="body"><div class="label">Rata-rata Scan Out</div><div class="value">${t(rep.total.deptTime)}</div>
+        <div class="sub">jam berangkat dari kantor</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("check")}</div>
+      <div class="body"><div class="label">Rata-rata Scan In</div><div class="value">${t(rep.total.arrTime)}</div>
+        <div class="sub">jam kembali ke kantor</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("store")}</div>
+      <div class="body"><div class="label">Rata-rata Toko Pertama</div><div class="value">${t(rep.total.jamIn)}</div>
+        <div class="sub">jam masuk toko pertama</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("pin")}</div>
+      <div class="body"><div class="label">Rata-rata Toko Terakhir</div><div class="value">${t(rep.total.jamOut)}</div>
+        <div class="sub">jam selesai di toko terakhir</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("clock")}</div>
+      <div class="body"><div class="label">Rata-rata Lama Bekerja</div><div class="value">${t(rep.total.lamaBekerjaDur)}</div>
+        <div class="sub">Scan In − Scan Out</div></div>
+    </div>`;
+}
+/* Sales dengan sendingan paling sering KOSONG (jam merah terbanyak) &
+   RNSH (89ZIP/99ZIP) tidak lengkap -- daftar utk disoroti/ditegur. */
+function renderSendingWorstAttendance() {
+  const wrap = document.getElementById("sendingWorstWrap");
+  if (!wrap) return;
+  const list = sendingWorstAttendance(10);
+  if (!list.length) { wrap.innerHTML = '<div class="exec-empty">Tidak ada data.</div>'; return; }
+  wrap.innerHTML = `
+    <table class="ar-table prestasi-table">
+      <thead><tr><th>Kode</th><th>Nama Sales</th><th>Jam Kosong (dari 9)</th><th>Total Sending</th><th>89ZIP</th><th>99ZIP</th></tr></thead>
+      <tbody>
+        ${list.map(o => `<tr>
+          <td>${o.slsNo}</td><td>${o.slsName}</td>
+          <td style="text-align:center; background:rgba(220,38,38,${(0.25 + (o.jamKosong / 9) * 0.55).toFixed(2)}); color:#fff; font-weight:700;">${fmtNum(o.jamKosong, 1)}</td>
+          <td style="text-align:center;">${fmtNum(o.totalSending, 1)}</td>
+          <td style="text-align:center;">${o.rnshTokoEver ? "✓" : '<span style="color:#dc2626; font-weight:700;">✗</span>'}</td>
+          <td style="text-align:center;">${o.rnshKantorEver ? "✓" : '<span style="color:#dc2626; font-weight:700;">✗</span>'}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>`;
 }
 function renderSendingReportTable() {
   const wrap = document.getElementById("sendingReportWrap");
@@ -10434,6 +10612,7 @@ function renderSendingReportTable() {
           <th colspan="2">Toko</th>
           <th colspan="2">FINISH</th>
           <th colspan="2">Durasi</th>
+          <th rowspan="2">Lama<br>Bekerja</th>
           <th colspan="${SENDING_HOURS.length}">Tertib Sending</th>
           <th rowspan="2">Total<br>Sending</th>
         </tr>
@@ -10454,6 +10633,7 @@ function renderSendingReportTable() {
           <td>${sendingTimeFmt(o.jamIn)}</td><td>${sendingTimeFmt(o.jamOut)}</td>
           ${rnshCell(o.rnshTokoEver, "89ZIP", "#22c55e")}${rnshCell(o.rnshKantorEver, "99ZIP", "#eab308")}
           <td>${sendingTimeFmt(o.pergiDur)}</td><td>${sendingTimeFmt(o.pulangDur)}</td>
+          <td style="text-align:center; font-weight:700;">${sendingTimeFmt(o.lamaBekerjaDur)}</td>
           ${o.hourTimes.map(arr => hourCell(arr)).join("")}
           <td style="text-align:center; font-weight:700;">${fmtNum(o.totalSending, o.hari > 1 ? 1 : 0)}</td>
         </tr>`).join("")}
@@ -10466,6 +10646,7 @@ function renderSendingReportTable() {
           <td style="text-align:center;">${fmtNum(rep.total.rnshTokoPct * 100, 0)}%</td>
           <td style="text-align:center;">${fmtNum(rep.total.rnshKantorPct * 100, 0)}%</td>
           <td>${sendingTimeFmt(rep.total.pergiDur)}</td><td>${sendingTimeFmt(rep.total.pulangDur)}</td>
+          <td style="text-align:center;">${sendingTimeFmt(rep.total.lamaBekerjaDur)}</td>
           <td colspan="${SENDING_HOURS.length}"></td>
           <td style="text-align:center;">${fmtNum(rep.total.totalSending, 1)}</td>
         </tr>
@@ -10478,7 +10659,9 @@ function renderSendingReportTable() {
 }
 function renderSendingDependent() {
   renderSendingBestChart();
+  renderSendingAvgKpiRow();
   renderSendingTop5Bottom5();
+  renderSendingWorstAttendance();
   renderSendingReportTable();
 }
 
@@ -13741,10 +13924,13 @@ CHART_REGISTRY.push(
   { id: "eroReasonBreakdown", title: "Breakdown Alasan (Reason Code)", section: "EDI RO" },
   { id: "eroReasonDetailWrap", title: "Detail Breakdown Alasan", section: "EDI RO" },
   { id: "eroPcodeSearchWrap", title: "Cari PCode", section: "EDI RO" },
+  { id: "eroFastMovingChart", title: "10 PCode Fast Moving", section: "EDI RO" },
+  { id: "eroNonFastMovingChart", title: "10 PCode Non-Fast Moving", section: "EDI RO" },
   { id: "prestasiBestChart", title: "Sales dengan Prestasi Terbaik", section: "Prestasi Tagih" },
   { id: "prestasiReportWrap", title: "Laporan Prestasi Tagih Salesman", section: "Prestasi Tagih" },
   { id: "sendingBestChart", title: "Sales dengan Prestasi Terbaik", section: "Prestasi Sending" },
   { id: "sendingReportWrap", title: "Laporan Prestasi Sending Salesman", section: "Prestasi Sending" },
+  { id: "sendingWorstWrap", title: "Sales Perlu Perhatian", section: "Prestasi Sending" },
   { id: "agingStockReportWrap", title: "Laporan Aging Stock", section: "Aging Stock" },
   { id: "mydexScanChart", title: "Breakdown Alasan Scan / Channel Toko", section: "Utilisasi MyDex" },
   { id: "mydexReportWrap", title: "Laporan Utilisasi Armada", section: "Utilisasi MyDex" },
@@ -13904,10 +14090,13 @@ Object.assign(RENDER_FN, {
   eroReasonBreakdown: renderEroReasonBreakdownChart,
   eroReasonDetailWrap: renderEroReasonDetailTable,
   eroPcodeSearchWrap: renderEroPcodeSearchTable,
+  eroFastMovingChart: renderEroFastMovingChart,
+  eroNonFastMovingChart: renderEroNonFastMovingChart,
   prestasiBestChart: renderPrestasiBestChart,
   prestasiReportWrap: renderPrestasiReportTable,
   sendingBestChart: renderSendingBestChart,
   sendingReportWrap: renderSendingReportTable,
+  sendingWorstWrap: renderSendingWorstAttendance,
   agingStockReportWrap: renderAgingStockReportTable,
   mydexScanChart: renderMydexScanChart,
   mydexReportWrap: renderMydexReportTable,
@@ -14173,6 +14362,37 @@ function exportTableToExcel(containerId, filenamePrefix) {
   }
   // Utilisasi MyDex -- Detail Transaksi & Ringkasan RPP juga punya kolom
   // Qty format desimal koma, sama rawannya dgn bug di atas.
+  // Sales Perlu Perhatian (Prestasi Sending) -- kolom "Jam Kosong" &
+  // "Total Sending" format desimal koma, rawan sama dgn bug di atas.
+  if (containerId === "sendingWorstWrap") {
+    renderSendingWorstAttendance();
+    const original = document.getElementById(containerId);
+    const table = original ? original.querySelector("table") : null;
+    if (!table) { showToast("Tabel belum ada datanya untuk diexport.", "error"); return; }
+    const clone = table.cloneNode(true);
+    [2, 3].forEach(i => {
+      clone.querySelectorAll("tbody tr").forEach(tr => {
+        const td = tr.children[i];
+        if (td) td.textContent = td.textContent.trim().replace(/\./g, "").replace(",", ".");
+      });
+    });
+    clone.style.position = "fixed"; clone.style.left = "-9999px"; clone.style.top = "0";
+    document.body.appendChild(clone);
+    try {
+      const ws = XLSX.utils.table_to_sheet(clone, { raw: false });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Data");
+      const stamp = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `${filenamePrefix}_${stamp}.xlsx`);
+      showToast("Tabel berhasil diexport ke Excel.", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Gagal export tabel: " + err.message, "error");
+    } finally {
+      clone.remove();
+    }
+    return;
+  }
   if (containerId === "mydexDetailWrap") {
     renderMydexDetailTable();
     const original = document.getElementById(containerId);

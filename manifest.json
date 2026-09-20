@@ -1,13 +1,14 @@
 {
   "name": "Dedy Hutasoit Tools Monitoring Cipta Niaga Semesta",
-  "short_name": "Monitoring CNS",
-  "description": "Dashboard monitoring omset, distribusi, warehouse, dan utilisasi armada — CNS Padang Sidempuan",
+  "short_name": "CNS Monitoring",
+  "description": "Dashboard monitoring Omset, EDI RO, Cut Cost, AR, dan operasional B259 Padang Sidimpuan",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0a0a0a",
-  "theme_color": "#c81e1e",
+  "background_color": "#0b0d10",
+  "theme_color": "#e0262c",
+  "lang": "id",
   "icons": [
     { "src": "icon-72.png", "sizes": "72x72", "type": "image/png", "purpose": "any" },
     { "src": "icon-96.png", "sizes": "96x96", "type": "image/png", "purpose": "any" },

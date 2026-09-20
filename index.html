@@ -3746,8 +3746,8 @@
             <option value="akun">Per Akun</option>
           </select>
           <select class="mode-select" id="ccAccountGroupModeSelect">
-            <option value="account" selected>Per GL Akun</option>
-            <option value="focus8">Per 8 Kategori (7 Fokus + Hotel)</option>
+            <option value="account">Per GL Akun</option>
+            <option value="focus8" selected>Per 8 Kategori (7 Fokus + Hotel)</option>
             <option value="focus7">Per 7 Fokus Biaya</option>
           </select>
           <label class="val-toggle"><input type="checkbox" data-values-target="ccTotal"><span>🔢 Nilai</span></label>
@@ -3764,8 +3764,8 @@
         </div>
         <div class="tools">
           <select class="mode-select" id="ccAccountGroupModeSelect2">
-            <option value="account" selected>Per GL Akun</option>
-            <option value="focus8">Per 8 Kategori (7 Fokus + Hotel)</option>
+            <option value="account">Per GL Akun</option>
+            <option value="focus8" selected>Per 8 Kategori (7 Fokus + Hotel)</option>
             <option value="focus7">Per 7 Fokus Biaya</option>
           </select>
           <label class="val-toggle"><input type="checkbox" data-values-target="ccAccount"><span>🔢 Nilai</span></label>
@@ -3781,7 +3781,7 @@
         <div class="tools">
           <select class="mode-select" id="ccViewModeSelect">
             <option value="account">Per GL Akun (tiap kode terpisah)</option>
-            <option value="focus">Per Biaya Fokus (gabungan kategori)</option>
+            <option value="focus" selected>Per Biaya Fokus (gabungan kategori)</option>
           </select>
         </div>
       </div>
@@ -9684,18 +9684,23 @@ const arSalesmanShowDetail = { value: false };
 const ccFilter = { start: "", end: "", account: "ALL" };
 // ccViewMode: "account" = Ringkasan per GL Akun (tiap kode terpisah),
 // "focus" = Ringkasan per Biaya Fokus (rollup semua kode dlm kategori,
-// mis. 6 kode BBM digabung 1 baris).
-const ccViewMode = { mode: "account" };
+// mis. 6 kode BBM digabung 1 baris; sudah termasuk HOTEL sbg kategori
+// sendiri). Default "focus" (7 Fokus + Hotel) sesuai permintaan user.
+const ccViewMode = { mode: "focus" };
 // Akun/fokus yg sedang dibuka drill-down-nya dari kartu Ringkasan
 // (null = belum ada yg dipilih), NOPOL & Filter Teks yg dipilih.
 const ccDrilldown = { account: null, focus: null, nopol: "ALL", textQuery: "" };
 const ccShowDetail = { value: false };
 const ccChartMode = { value: "tanggal" }; // "tanggal" = tren harian, "akun" = total per akun (7 fokus biaya)
-// Sub-filter khusus mode "akun" (grup nominal per akun) -- "account" =
-// tiap kode GL terpisah, "focus8" = 8 Biaya Fokus (incl. HOTEL),
-// "focus7" = 7 Fokus lama (HOTEL digabung Lainnya). Dipakai bersama utk
-// kedua chart "Jumlah Nominal Biaya per Akun" & "Detail per Akun Biaya".
-const ccAccountGroupMode = { value: "account" };
+// Sub-filter mode "akun" (grup nominal per akun) -- "account" = tiap
+// kode GL terpisah, "focus8" = 8 Biaya Fokus (7 Fokus + HOTEL, INI
+// DEFAULT sesuai permintaan user), "focus7" = 7 Fokus lama (HOTEL
+// digabung Lainnya). DUA STATE TERPISAH (bukan 1 shared) -- chart
+// "Total Biaya Operasional" & "Detail per Akun Biaya" tidak lagi saling
+// mempengaruhi saat salah satu filternya diganti, sesuai permintaan
+// user "filter dari kolom satu ke kolom lainnya tidak konek".
+const ccTotalChartMode = { value: "focus8" };
+const ccDetailChartMode = { value: "focus8" };
 /* =========================================================================
    Klasifikasi GL Akun Cut Cost -- BANYAK kode GL bisa masuk SATU kategori
    "Biaya Fokus" (mis. BBM mencakup 6 kode berbeda: Delivery/M&S/G&A x
@@ -10369,7 +10374,7 @@ function renderCutCostTotalChart() {
   const descEl = document.getElementById("ccTotalDesc");
   if (titleEl && descEl) {
     if (ccChartMode.value === "akun") {
-      const modeLabel = ccAccountGroupMode.value === "focus8" ? "8 Biaya Fokus" : (ccAccountGroupMode.value === "focus7" ? "7 Fokus Biaya" : "GL Akun");
+      const modeLabel = ccTotalChartMode.value === "focus8" ? "8 Biaya Fokus" : (ccTotalChartMode.value === "focus7" ? "7 Fokus Biaya" : "GL Akun");
       titleEl.textContent = `Jumlah Nominal Biaya per Akun (${modeLabel})`;
       descEl.textContent = "Total pengeluaran tiap akun/kategori pada periode yang difilter";
     } else {
@@ -10381,7 +10386,7 @@ function renderCutCostTotalChart() {
   destroyChart("ccTotal");
 
   if (ccChartMode.value === "akun") {
-    const byAcc = cutCostByAccountMode(rows, ccAccountGroupMode.value);
+    const byAcc = cutCostByAccountMode(rows, ccTotalChartMode.value);
     CHARTS.ccTotal = new Chart(document.getElementById("chart-ccTotal"), {
       type: "bar",
       data: { labels: byAcc.map(a => a.name), datasets: [{ label: "Total Biaya (Rp)", data: byAcc.map(a => a.nominal), backgroundColor: byAcc.map((a, i) => ccColorFor(a.account, i)) }] },
@@ -10417,7 +10422,7 @@ function renderCutCostAccountChart() {
   const rows = fCutCost();
   if (ensureEmptyState("chart-ccAccount", rows.length === 0)) return;
   destroyChart("ccAccount");
-  const mode = ccAccountGroupMode.value;
+  const mode = ccDetailChartMode.value;
   const t = cutCostByDateAccountMode(rows, mode);
   // Filter dropdown "Akun Biaya" (ccFilter.account) hanya berisi kode GL
   // lama -- relevan hanya utk mode "account"; mode focus7/focus8 selalu
@@ -10567,6 +10572,15 @@ function renderCcAccountDrilldown() {
   }
   nopolList = punyaNopol ? [...new Set(baseRows.filter(r => r.nopol).map(r => r.nopol))].sort() : [];
 
+  // Filter UI (dropdown NOPOL + kotak Filter Teks) dibangun DI SINI SAJA
+  // -- fungsi ini hanya dipanggil saat akun/fokus BERGANTI (klik tombol
+  // Detail baru), TIDAK setiap kali user mengetik. Sebelumnya kotak teks
+  // ikut dibangun ulang tiap ketikan (via renderCcAccountDrilldown()
+  // dipanggil dari listener "input"), yg menghancurkan & membuat ulang
+  // elemen <input> itu sendiri -- fokus keyboard & posisi kursor hilang
+  // tiap huruf, user harus klik ulang shg TERASA lambat/macet (bukan
+  // komputasinya yg lambat). Sekarang listener teks hanya memanggil
+  // renderCcDrilldownResults() yg TIDAK menyentuh filterWrap sama sekali.
   if (filterWrap) {
     filterWrap.innerHTML = `
       ${punyaNopol ? `<div class="field" style="min-width:220px;"><label>Filter NOPOL (frekuensi per hari)</label>
@@ -10579,16 +10593,38 @@ function renderCcAccountDrilldown() {
         <input type="text" id="ccTextFilterInput" placeholder="mis. nama toko, keterangan..." value="${(ccDrilldown.textQuery || "").replace(/"/g, "&quot;")}">
       </div>`;
     const sel = document.getElementById("ccNopolSelect");
-    if (sel) sel.addEventListener("change", (e) => { ccDrilldown.nopol = e.target.value; renderCcAccountDrilldown(); });
+    if (sel) sel.addEventListener("change", (e) => { ccDrilldown.nopol = e.target.value; renderCcDrilldownResults(); });
     const textInput = document.getElementById("ccTextFilterInput");
     if (textInput) {
       let debounce = null;
       textInput.addEventListener("input", (e) => {
         const val = e.target.value;
         clearTimeout(debounce);
-        debounce = setTimeout(() => { ccDrilldown.textQuery = val; renderCcAccountDrilldown(); }, 300);
+        debounce = setTimeout(() => { ccDrilldown.textQuery = val; renderCcDrilldownResults(); }, 300);
       });
     }
+  }
+  renderCcDrilldownResults();
+}
+/* Bagian TABEL HASIL saja (dipanggil ulang setiap filter NOPOL/Teks
+   berubah) -- TIDAK menyentuh filterWrap, supaya elemen <input> teks
+   tidak pernah dibangun ulang & fokus keyboard tidak hilang saat
+   mengetik. Mengulang logika pemilihan baseRows/punyaNopol/isFocusMode
+   dari ccDrilldown saat ini (state global, bukan parameter) supaya
+   tetap konsisten dgn renderCcAccountDrilldown() di atas. */
+function renderCcDrilldownResults() {
+  const wrap = document.getElementById("ccDrilldownWrap");
+  if (!wrap) return;
+  const isFocusMode = !!ccDrilldown.focus;
+  const isAccountMode = !!ccDrilldown.account;
+  if (!isFocusMode && !isAccountMode) return;
+  let baseRows, punyaNopol;
+  if (isFocusMode) {
+    baseRows = cutCostFocusDetail(ccDrilldown.focus);
+    punyaNopol = ccDrilldown.focus === "BBM" || ccDrilldown.focus === "SERVICE MOBIL";
+  } else {
+    baseRows = cutCostAccountDetail(ccDrilldown.account);
+    punyaNopol = ccAccountLikelyHasNopol(ccDrilldown.account);
   }
 
   // Prioritas: NOPOL exact-match dulu (kalau dipilih) -> tampilkan
@@ -13171,11 +13207,6 @@ function renderExecBsDonut(labels, data, colors, total) {
     const d = (c) => Math.round(c * (1 - ratio));
     return `rgb(${d(rr)}, ${d(gg)}, ${d(bb)})`;
   };
-  // Bikin gradient radial per warna, dari titik chartArea yg SUDAH
-  // benar (dipetakan setelah chart pertama selesai layout). Dipasang
-  // sbg ARRAY statis (bukan scriptable function) krn doughnut controller
-  // Chart.js tampak salah memetakan scriptable backgroundColor per index
-  // pada versi ini -- array statis adalah cara yg terbukti benar.
   const buildGradients = (chart) => {
     const { chartArea, ctx } = chart;
     if (!chartArea) return colors;
@@ -13190,9 +13221,25 @@ function renderExecBsDonut(labels, data, colors, total) {
       return g;
     });
   };
+  // Gradient dibangun di "beforeDatasetsDraw" -- hook ini dijamin selalu
+  // dipanggil SETELAH layout selesai (chartArea pasti valid), tepat
+  // sebelum digambar, di SETIAP frame termasuk saat render pertama kali.
+  // Ini menggantikan pendekatan lama (requestAnimationFrame + update()
+  // terpisah) yg ternyata rawan race condition: pada render pertama
+  // (mis. baru upload data, canvas baru dipasang ke DOM), frame RAF bisa
+  // berjalan SEBELUM Chart.js selesai layout awal, sehingga fallback ke
+  // warna solid -- lalu entah kenapa warna solid itu pun kadang tak
+  // ikut ter-apply krn urutan draw yg sudah lewat. Ganti tema memicu
+  // renderAll() -> re-render SEMUA chart dari nol termasuk donat ini,
+  // yg "kebetulan" memberi kesempatan kedua sampai timing-nya pas --
+  // itu sebabnya warna baru muncul setelah ganti tema, bukan dari awal.
   const shadowPlugin = {
     id: "execBsDonutShadow",
     beforeDatasetsDraw(chart) {
+      const gradients = buildGradients(chart);
+      chart.data.datasets[0].backgroundColor = gradients;
+      const meta = chart.getDatasetMeta(0);
+      meta.data.forEach((el, i) => { if (el.options) el.options.backgroundColor = gradients[i]; });
       const { ctx: c } = chart;
       c.save();
       c.shadowColor = "rgba(0,0,0,0.55)";
@@ -13215,15 +13262,6 @@ function renderExecBsDonut(labels, data, colors, total) {
       },
       scales: {}
     })
-  });
-  // Render pertama pakai warna solid (chartArea belum ada saat
-  // constructor jalan); begitu chartArea valid, timpa dgn gradient lalu
-  // update SEKALI TANPA animasi ulang (supaya tidak "berkedip").
-  requestAnimationFrame(() => {
-    const chart = CHARTS.execBsDonut;
-    if (!chart) return;
-    chart.data.datasets[0].backgroundColor = buildGradients(chart);
-    chart.update("none");
   });
 }
 
@@ -14805,12 +14843,12 @@ function resetAllData() {
   DB.waBlast = []; waFilter.start = ""; waFilter.end = ""; waShowDetail.value = false;
   setUploadStatus("wablast", "Belum ada data", false);
   DB.cutCost = []; ccFilter.start = ""; ccFilter.end = ""; ccFilter.account = "ALL"; ccShowDetail.value = false; ccChartMode.value = "tanggal";
-  ccViewMode.mode = "account"; ccDrilldown.account = null; ccDrilldown.focus = null; ccDrilldown.nopol = "ALL"; ccDrilldown.textQuery = "";
-  ccAccountGroupMode.value = "account";
-  const ccViewModeReset = document.getElementById("ccViewModeSelect"); if (ccViewModeReset) ccViewModeReset.value = "account";
+  ccViewMode.mode = "focus"; ccDrilldown.account = null; ccDrilldown.focus = null; ccDrilldown.nopol = "ALL"; ccDrilldown.textQuery = "";
+  ccTotalChartMode.value = "focus8"; ccDetailChartMode.value = "focus8";
+  const ccViewModeReset = document.getElementById("ccViewModeSelect"); if (ccViewModeReset) ccViewModeReset.value = "focus";
   const ccModeReset2 = document.getElementById("ccChartModeSelect"); if (ccModeReset2) ccModeReset2.value = "tanggal";
-  const ccGroupReset1 = document.getElementById("ccAccountGroupModeSelect"); if (ccGroupReset1) ccGroupReset1.value = "account";
-  const ccGroupReset2 = document.getElementById("ccAccountGroupModeSelect2"); if (ccGroupReset2) ccGroupReset2.value = "account";
+  const ccGroupReset1 = document.getElementById("ccAccountGroupModeSelect"); if (ccGroupReset1) ccGroupReset1.value = "focus8";
+  const ccGroupReset2 = document.getElementById("ccAccountGroupModeSelect2"); if (ccGroupReset2) ccGroupReset2.value = "focus8";
   setUploadStatus("cutcost", "Belum ada data", false);
   DB.utilGudang = null; whUtilFilter.metric = "avgSalesWeek"; whUtilFilter.branch = "ALL";
   setUploadStatus("utilgudang", "Belum ada data", false);
@@ -16621,19 +16659,20 @@ function init() {
     });
   }
   // Dua dropdown (di kartu "Total Biaya" & "Detail per Akun Biaya")
-  // berbagi SATU state ccAccountGroupMode -- sinkronkan nilai keduanya
-  // & re-render kedua chart apa pun yg diubah user.
+  // dulu berbagi SATU state (sinkron paksa) -- sekarang DIPISAH jadi 2
+  // state independen (ccTotalChartMode/ccDetailChartMode) sesuai
+  // permintaan user "filter dari kolom satu ke kolom lainnya tidak
+  // konek". Tiap dropdown hanya me-render ulang chart miliknya sendiri.
   const ccGroupSel1 = document.getElementById("ccAccountGroupModeSelect");
-  const ccGroupSel2 = document.getElementById("ccAccountGroupModeSelect2");
-  const onCcGroupModeChange = (e) => {
-    ccAccountGroupMode.value = e.target.value;
-    if (ccGroupSel1) ccGroupSel1.value = ccAccountGroupMode.value;
-    if (ccGroupSel2) ccGroupSel2.value = ccAccountGroupMode.value;
+  if (ccGroupSel1) ccGroupSel1.addEventListener("change", (e) => {
+    ccTotalChartMode.value = e.target.value;
     renderCutCostTotalChart();
+  });
+  const ccGroupSel2 = document.getElementById("ccAccountGroupModeSelect2");
+  if (ccGroupSel2) ccGroupSel2.addEventListener("change", (e) => {
+    ccDetailChartMode.value = e.target.value;
     renderCutCostAccountChart();
-  };
-  if (ccGroupSel1) ccGroupSel1.addEventListener("change", onCcGroupModeChange);
-  if (ccGroupSel2) ccGroupSel2.addEventListener("change", onCcGroupModeChange);
+  });
   const ccDetailToggle = document.getElementById("ccShowDetailToggle");
   if (ccDetailToggle) {
     ccDetailToggle.addEventListener("change", (e) => {

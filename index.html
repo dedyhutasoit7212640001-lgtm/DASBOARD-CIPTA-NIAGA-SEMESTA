@@ -209,6 +209,16 @@
      kanan baris terakhir; flexbox tidak). */
   .grid-kpi-flex{display:flex !important; flex-wrap:wrap; gap:14px;}
   .grid-kpi-flex > .kpi-card{flex:1 1 190px;}
+  /* 8 KPI Stock -- kolom TETAP (bukan auto-fit/flex-grow) supaya semua
+     8 kartu muat rata dalam SATU baris di layar desktop tanpa ada satu
+     kartu pun yg melebar sendirian mengisi baris ke-2 (masalah yg terjadi
+     kalau pakai .grid-kpi-flex biasa utk jumlah kartu yg tak habis dibagi
+     rapi). 8 dipilih krn selalu habis dibagi (4x2, 2x4) di semua
+     breakpoint -- beda dari 7 (bilangan prima, rawan sisa 1 kartu). */
+  .grid-kpi-8{grid-template-columns:repeat(8,1fr); gap:12px;}
+  @media (max-width:1600px){ .grid-kpi-8{grid-template-columns:repeat(4,1fr);} }
+  @media (max-width:900px){ .grid-kpi-8{grid-template-columns:repeat(2,1fr);} }
+  .stock-ringkasan-row.active > td{background:var(--accent-soft) !important; font-weight:700;}
   @media (max-width:1100px){ .grid-3,.grid-2,.grid-4{grid-template-columns:repeat(2,1fr);} }
   @media (max-width:640px){ .grid-3,.grid-2,.grid-4{grid-template-columns:1fr;} nav.navpills{display:none;} }
 
@@ -2561,6 +2571,7 @@
       <a href="#" data-nav="warehouse" data-wh-mode="SO" class="sb-sub">Frekuensi Opname</a>
       <a href="#" data-nav="inbound" class="sb-sub">Inbound</a>
       <a href="#" data-nav="agingstock" class="sb-sub">Aging Stock</a>
+      <a href="#" data-nav="stock" class="sb-sub">Stock</a>
     </details>
 
     <a href="#" data-nav="mpp" class="sb-link sb-top">
@@ -2670,6 +2681,18 @@
         <div><b>DATA AGING STOCK</b></div>
         <label class="btn">Pilih File<input type="file" accept=".xls,.xlsx" data-target="agingstock"></label>
         <div class="status" data-status="agingstock">Belum ada data</div>
+      </div>
+      <div class="card uploader" id="up-stockgudang">
+        <div class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-6 9 6v11a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg></div>
+        <div><b>DAFTAR STOCK GUDANG</b></div>
+        <label class="btn">Pilih File<input type="file" accept=".xls,.xlsx" data-target="stockgudang"></label>
+        <div class="status" data-status="stockgudang">Belum ada data</div>
+      </div>
+      <div class="card uploader" id="up-edistock">
+        <div class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+        <div><b>DATA EDI STOCK</b></div>
+        <label class="btn">Pilih File<input type="file" accept=".csv,.txt" data-target="edistock"></label>
+        <div class="status" data-status="edistock">Belum ada data</div>
       </div>
       <div class="card uploader" id="up-mydex">
         <div class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14M5 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM19 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM3 17V9l2-5h10l4 5h2v8"/></svg></div>
@@ -3163,6 +3186,118 @@
       </div>
       <div class="table-export-row"><button class="table-export-btn" data-export-table="agingStockReportWrap" data-export-name="AgingStock_Laporan">⬇️ Excel</button></div>
       <div id="agingStockReportWrap" style="max-height:640px; overflow:auto; margin-top:8px;"></div>
+    </div>
+  </section>
+
+  <!-- ============ WAREHOUSE > STOCK ============ -->
+  <section class="block" id="sec-stock" data-page="stock">
+    <div class="head"><h2>📦 Stock</h2><span>Stock gudang per Pcode — digabung dari Daftar Stock Gudang & EDI Stock (utk info Divisi)</span></div>
+
+    <!-- ===== Filter Gudang (GD) -- WH01=tampilan lengkap, WH02/WH03=Pcode+Stock saja ===== -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="filterbar">
+        <div class="field" style="min-width:220px;">
+          <label>Filter Gudang (GD)</label>
+          <select class="mode-select" id="stockGdSelect">
+            <option value="WH01" selected>WH01 (tampilan lengkap)</option>
+            <option value="WH02">WH02</option>
+            <option value="WH03">WH03</option>
+          </select>
+        </div>
+      </div>
+      <div style="font-size:11px; color:var(--sub); margin-top:6px;">WH01 menampilkan analisis lengkap (SCD, RPP, Average Sales, Top 20, per Divisi). WH02/WH03 hanya menampilkan Pcode, Nama Produk, dan Stock (total) — data langsung dari EDI Stock.</div>
+    </div>
+
+    <!-- ============ WH01: tampilan lengkap ============ -->
+    <div id="stockWh01Section">
+
+    <div class="grid grid-kpi-8" id="stockKpiRow"></div>
+
+    <!-- ===== Filter Divisi ===== -->
+    <div class="card" style="margin:16px 0;">
+      <div class="filterbar">
+        <div class="field" style="min-width:220px;">
+          <label>Filter Divisi</label>
+          <select class="mode-select" id="stockDivisiSelect">
+            <option value="ALL">Semua Divisi</option>
+            <option value="BIS">BIS</option>
+            <option value="CWC">CWC</option>
+            <option value="MU245">MU245</option>
+            <option value="M3">M3</option>
+            <option value="M1">M1</option>
+          </select>
+        </div>
+      </div>
+      <div style="font-size:11px; color:var(--sub); margin-top:6px;">Divisi Sales dari 2 sumber sekaligus: BIS/CWC/MU245/M3 dari kode salesman (kolom GD) di EDI Stock, DAN M1/MU245/M3 dari kategori produk (kolom DIVISI) — M1 = gabungan kategori Candy/Biscuit/Wafer/Chocolate/Jelly/Cake&Bread/Snack. Satu Pcode bisa masuk lebih dari satu divisi sekaligus dari kedua sumber ini. Kalau EDI Stock belum diupload, semua Pcode tampil tanpa info divisi. Pcode dengan Total Stock = 0 tidak ditampilkan.</div>
+    </div>
+
+    <!-- ===== Ringkasan Stock (Besar/Tengah/Kecil) ===== -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-top"><div class="titles"><h3>📋 Ringkasan Stock</h3><div class="desc">Total Stok, On Cust Order, dan Real Stock (Total − On Cust) — dipecah per ukuran kemasan Besar/Tengah/Kecil. Klik salah satu baris untuk lihat rincian per Pcode.</div></div></div>
+      <div id="stockRingkasanWrap"></div>
+      <div id="stockRingkasanDrilldown" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- ===== Top 20 SCD ===== -->
+    <div class="grid grid-2">
+      <div class="card chart-card" data-chart-id="stockTop20ScdHigh" data-chart-title="Stock - Top 20 SCD Tertinggi">
+        <div class="titles"><h3>🔴 Top 20 SCD Tertinggi</h3><div class="desc">Produk dengan Stock Cover Day terbesar (stok menumpuk lama)</div></div>
+        <div class="chart-canvas-wrap" style="height:420px;"><canvas id="chart-stockTop20ScdHigh"></canvas></div>
+      </div>
+      <div class="card chart-card" data-chart-id="stockTop20ScdLow" data-chart-title="Stock - Top 20 SCD Terendah">
+        <div class="titles"><h3>🟢 Top 20 SCD Terendah</h3><div class="desc">Produk dengan Stock Cover Day terkecil (perputaran stok cepat)</div></div>
+        <div class="chart-canvas-wrap" style="height:420px;"><canvas id="chart-stockTop20ScdLow"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ===== Top 20 Average Sales ===== -->
+    <div class="grid grid-2" style="margin-top:16px;">
+      <div class="card chart-card" data-chart-id="stockTop20AvgHigh" data-chart-title="Stock - Top 20 Average Sales Tertinggi">
+        <div class="titles"><h3>🔴 Top 20 Average Sales Tertinggi</h3><div class="desc">Produk dengan rata-rata penjualan harian terbesar</div></div>
+        <div class="chart-canvas-wrap" style="height:420px;"><canvas id="chart-stockTop20AvgHigh"></canvas></div>
+      </div>
+      <div class="card chart-card" data-chart-id="stockTop20AvgLow" data-chart-title="Stock - Top 20 Average Sales Terendah">
+        <div class="titles"><h3>🟢 Top 20 Average Sales Terendah</h3><div class="desc">Produk dengan rata-rata penjualan harian terkecil</div></div>
+        <div class="chart-canvas-wrap" style="height:420px;"><canvas id="chart-stockTop20AvgLow"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ===== Rata-rata Average Sales per Divisi ===== -->
+    <div class="card chart-card" data-chart-id="stockAvgDivisiWrap" data-chart-title="Stock - Rata-rata Average Sales per Divisi" style="margin-top:16px;">
+      <div id="chart-stockAvgDivisiWrap" style="display:none;"></div>
+      <div class="card-top"><div class="titles"><h3>🧮 Rata-rata Average Sales per Divisi</h3><div class="desc">Rata-rata Average Sales & SCD per divisi — BIS/CWC/MU245/M3 dari kode salesman, plus M1/MU245/M3 dari kategori produk</div></div></div>
+      <div class="table-export-row"><button class="table-export-btn" data-export-table="stockAvgDivisiWrap" data-export-name="Stock_AvgPerDivisi">⬇️ Excel</button></div>
+      <div id="stockAvgDivisiWrap" style="margin-top:8px;"></div>
+    </div>
+
+    <!-- ===== Detail Semua Pcode ===== -->
+    <div class="card chart-card" data-chart-id="stockDetailWrap" data-chart-title="Stock - Detail Semua Pcode" style="margin-top:16px;">
+      <div id="chart-stockDetailWrap" style="display:none;"></div>
+      <div class="card-top"><div class="titles"><h3>📄 Detail Semua Pcode</h3><div class="desc">Seluruh Pcode dengan rincian Stock, On Cust, Real Stock, RPP 13 Pekan, SCD, Average Sales, dan Divisi</div></div></div>
+      <div class="filterbar" style="margin-bottom:6px;">
+        <div class="field" style="min-width:280px;"><label>Cari Pcode / Nama Produk</label><input type="text" id="stockDetailSearchInput" placeholder="mis. 311644 atau KOPIKO"></div>
+      </div>
+      <div id="stockDetailSearchCount" style="font-size:12px; color:var(--sub); font-weight:700; margin-bottom:6px;"></div>
+      <div class="table-export-row"><button class="table-export-btn" data-export-table="stockDetailWrap" data-export-name="Stock_Detail">⬇️ Excel</button></div>
+      <div id="stockDetailWrap" style="max-height:640px; overflow:auto; margin-top:8px;"></div>
+    </div>
+
+    </div>
+    <!-- ============ /WH01 ============ -->
+
+    <!-- ============ WH02/WH03: tampilan sederhana (Pcode, Nama, Stock) ============ -->
+    <div id="stockWhSimpleSection" style="display:none;">
+      <div class="grid grid-kpi" id="stockWhSimpleKpiRow"></div>
+      <div class="card chart-card" data-chart-id="stockWhSimpleWrap" data-chart-title="Stock - Pcode per Gudang" style="margin-top:16px;">
+        <div id="chart-stockWhSimpleWrap" style="display:none;"></div>
+        <div class="card-top"><div class="titles"><h3 id="stockWhSimpleTitle">📄 Pcode per Gudang</h3><div class="desc">Pcode, Nama Produk, dan Stock (total) — langsung dari EDI Stock</div></div></div>
+        <div class="filterbar" style="margin-bottom:6px;">
+          <div class="field" style="min-width:280px;"><label>Cari Pcode / Nama Produk</label><input type="text" id="stockWhSimpleSearchInput" placeholder="mis. 311644 atau KOPIKO"></div>
+        </div>
+        <div id="stockWhSimpleSearchCount" style="font-size:12px; color:var(--sub); font-weight:700; margin-bottom:6px;"></div>
+        <div class="table-export-row"><button class="table-export-btn" data-export-table="stockWhSimpleWrap" data-export-name="Stock_PerGudang">⬇️ Excel</button></div>
+        <div id="stockWhSimpleWrap" style="max-height:640px; overflow:auto; margin-top:8px;"></div>
+      </div>
     </div>
   </section>
 
@@ -5042,7 +5177,7 @@ function cardBg() { return getComputedStyle(document.documentElement).getPropert
 function CV(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
 /* ---------- State ---------- */
-const DB = { epe: [], qty: [], outlet: [], lbp: [], bs: [], ar: [], stockOpname: [], waBlast: [], cutCost: [], utilGudang: null, openItem: [], ediRo: [], mpp: null, pnl: [], inbound: [], prestasi: [], sending: [], agingStock: [], mydex: [] };
+const DB = { epe: [], qty: [], outlet: [], lbp: [], bs: [], ar: [], stockOpname: [], waBlast: [], cutCost: [], utilGudang: null, openItem: [], ediRo: [], mpp: null, pnl: [], inbound: [], prestasi: [], sending: [], agingStock: [], mydex: [], stockGudang: [], ediStock: [] };
 const mydexFilter = { start: "", end: "" };
 const prestasiFilter = { start: "", end: "", divisi: "ALL" };
 /* Filter Salesman Prestasi Tagih -- checklist utk memilih siapa saja yang
@@ -5094,8 +5229,19 @@ const chartModes = {
 /* =========================================================================
    NAVIGASI HALAMAN (tab)
    ========================================================================= */
+// Cache hasil querySelectorAll("[data-page]") & ("[data-nav]") -- KEDUA
+// struktur elemen ini TIDAK PERNAH berubah setelah halaman selesai
+// dimuat (tak ada innerHTML yg menghapus/membuat ulang elemen2 ini),
+// jadi query ulang setiap kali showPage() dipanggil (setiap klik
+// navigasi) hanya buang waktu percuma -- pada dashboard sebesar ini
+// (23 ribuan elemen DOM total), query ulang berkontribusi nyata ke
+// rasa "berat" saat pindah ribbon. Diisi malas (lazy) saat showPage()
+// PERTAMA kali dipanggil.
+let _pageEls = null, _navEls = null;
 function showPage(page) {
-  document.querySelectorAll("[data-page]").forEach(el => {
+  if (!_pageEls) _pageEls = Array.from(document.querySelectorAll("[data-page]"));
+  if (!_navEls) _navEls = Array.from(document.querySelectorAll("[data-nav]"));
+  _pageEls.forEach(el => {
     const pages = el.getAttribute("data-page").split(" ");
     el.style.display = pages.includes(page) ? "" : "none";
   });
@@ -5106,7 +5252,7 @@ function showPage(page) {
   // Opname) -- ketiganya berbagi data-nav="warehouse" yang SAMA, jadi
   // dibedakan lagi lewat mode-nya supaya HANYA satu yang aktif sekaligus,
   // bukan ketiganya (bug yang sempat terjadi & diperbaiki).
-  document.querySelectorAll("[data-nav]").forEach(a => {
+  _navEls.forEach(a => {
     const whMode = a.getAttribute("data-wh-mode");
     if (whMode !== null) {
       a.classList.toggle("active", page === "warehouse" && whMode === whModeFilter.value);
@@ -5116,12 +5262,29 @@ function showPage(page) {
   });
   // Buka grup sidebar (<details>) yang memuat halaman aktif, supaya
   // sub-menu yang sedang dipakai selalu terlihat.
-  document.querySelectorAll(`.sb-sub[data-nav="${page}"]`).forEach(a => {
-    const group = a.closest("details.sb-group");
-    if (group) group.open = true;
+  _navEls.forEach(a => {
+    if (a.classList.contains("sb-sub") && a.getAttribute("data-nav") === page) {
+      const group = a.closest("details.sb-group");
+      if (group) group.open = true;
+    }
   });
   document.getElementById("top").scrollIntoView({ behavior: "instant", block: "start" });
-  requestAnimationFrame(() => { Object.values(CHARTS).forEach(c => { try { c.resize(); } catch (e) {} }); });
+  // PENTING (perbaikan performa navigasi): resize() SEBELUMNYA dipanggil
+  // pada SEMUA Chart.js instance yg pernah dibuat di seluruh dashboard
+  // (bisa 40+ chart stlh semua sumber data diupload), termasuk yg sedang
+  // tersembunyi (display:none) di halaman LAIN yg tak sedang dibuka --
+  // ini penyebab utama perpindahan ribbon terasa berat/lambat, krn
+  // resize() Chart.js selalu memicu re-layout+redraw penuh (mahal),
+  // dikali puluhan chart, PADAHAL chart yg tersembunyi toh tidak
+  // terlihat & akan otomatis di-resize benar nanti saat halamannya
+  // sendiri dibuka. Sekarang HANYA chart yg canvas-nya benar2 visible
+  // (offsetParent tidak null -- cara cepat cek visibility DOM tanpa
+  // getComputedStyle yg lebih mahal) yg di-resize.
+  requestAnimationFrame(() => {
+    Object.values(CHARTS).forEach(c => {
+      try { if (c.canvas && c.canvas.offsetParent !== null) c.resize(); } catch (e) {}
+    });
+  });
 }
 
 /* =========================================================================
@@ -5993,7 +6156,7 @@ function bsMainGroup(division) {
   return "UNCLASSIFIED";
 }
 /* Warna divisi — identik dengan warna yang dipakai di grafik Omset agar konsisten */
-const DIV_ALL_COLORS = { BIS: SEM.red, CWC: SEM.yellow, MU: SEM.green, M3: SEM.blue };
+const DIV_ALL_COLORS = { BIS: SEM.red, CWC: SEM.yellow, MU: SEM.green, M3: SEM.blue, M1: SEM.red, MU245: SEM.green };
 
 /* Legend Reason Code Bad Stock (EDI PPBR) — urutan & arti sesuai instruksi, jangan diubah */
 const BS_REASON_LEGEND = {
@@ -7270,6 +7433,151 @@ function parseAgingStockWorkbook(buf) {
   if (!rows.length) throw new Error("Tidak ada baris data produk valid ditemukan di file Aging Stock.");
   return rows;
 }
+/* =========================================================================
+   RIBBON WAREHOUSE > STOCK -- dibaca dari 2 file digabung via Pcode:
+   1) "Daftar Stock Gudang" (.xlsx) -- SUMBER UTAMA per-Pcode: Total Stok
+      & On Cust (masing2 pecah Besar/Tengah/Kecil), RPP 13 Pekan, Stock
+      Cover Day (SCD). Average Sales DIHITUNG dari SCD & Total Stock
+      pakai rumus yg diberikan user: SCD=(StockGudang/AvgSales)×6, jadi
+      AvgSales=(StockGudang×6)/SCD -- "Stock Gudang" di rumus ini = Total
+      Stock (BSR+TGH+KCL), BUKAN Real Stock, sesuai instruksi eksplisit.
+   2) "EDI Stock" (.csv pipe-delimited) -- TIDAK punya SCD/RPP sama
+      sekali, tapi punya kolom GD (kode+nama salesman/gudang per baris)
+      yg dipakai HANYA utk memetakan Pcode -> Divisi Sales (BIS/CWC/MU/
+      M3) via classifySalesman(), krn "DIVISI" bawaan file ini adalah
+      KATEGORI PRODUK (Coffee/Biscuit/dst), bukan divisi sales. Satu
+      Pcode bisa dipegang banyak salesman dari banyak divisi berbeda
+      sekaligus (many-to-many) -- makanya field `divisions` di bawah
+      berupa ARRAY, bukan 1 nilai tunggal.
+   ========================================================================= */
+function parseStockGudangWorkbook(buf) {
+  const wb = XLSX.read(buf, { type: "array", cellDates: false, raw: true });
+  const grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: "" });
+  if (!grid.length) throw new Error("File Daftar Stock Gudang kosong.");
+  const header = (grid[0] || []).map(s => String(s || "").trim());
+  const idx = name => header.indexOf(name);
+  const iSubdist = idx("Kode Subdist"), iTgl = idx("Tgl. Transaksi"), iPcode = idx("Pcode"),
+    iNama = idx("Nama Produk"), iSatuan = idx("Satuan/Isi"),
+    iStokBsr = idx("Total Stok - BSR"), iStokTgh = idx("Total Stok - TGH"), iStokKcl = idx("Total Stok - KCL"),
+    iOcBsr = idx("On Cust Order - BSR"), iOcTgh = idx("On Cust Order - TGH"), iOcKcl = idx("On Cust Order - KCL"),
+    iRpp = idx("RPP 13 Pekan"), iScd = idx("Stock Cover Day");
+  if (iPcode < 0 || iNama < 0 || iStokBsr < 0) {
+    throw new Error("Format file Daftar Stock Gudang tidak dikenali (kolom Pcode/Nama Produk/Total Stok - BSR tidak ditemukan).");
+  }
+  const num = v => { const n = parseFloat(String(v).replace(/,/g, ".")); return Number.isFinite(n) ? n : 0; };
+  const rows = [];
+  for (let r = 1; r < grid.length; r++) {
+    const row = grid[r];
+    if (!row || !row.length) continue;
+    const pcode = String(row[iPcode] || "").trim();
+    if (!pcode) continue;
+    const stokBsr = num(row[iStokBsr]), stokTgh = num(row[iStokTgh]), stokKcl = num(row[iStokKcl]);
+    const ocBsr = num(row[iOcBsr]), ocTgh = num(row[iOcTgh]), ocKcl = num(row[iOcKcl]);
+    const totalStock = stokBsr + stokTgh + stokKcl;
+    const scd = iScd >= 0 ? num(row[iScd]) : 0;
+    rows.push({
+      subdist: iSubdist >= 0 ? String(row[iSubdist] || "").trim() : "",
+      tglTransaksi: iTgl >= 0 ? String(row[iTgl] || "").trim() : "",
+      pcode, namaProduk: String(row[iNama] || "").trim(),
+      satuanIsi: iSatuan >= 0 ? String(row[iSatuan] || "").trim() : "",
+      stokBsr, stokTgh, stokKcl, totalStock,
+      ocBsr, ocTgh, ocKcl, totalOnCust: ocBsr + ocTgh + ocKcl,
+      realBsr: stokBsr - ocBsr, realTgh: stokTgh - ocTgh, realKcl: stokKcl - ocKcl,
+      realTotal: totalStock - (ocBsr + ocTgh + ocKcl),
+      rpp13: iRpp >= 0 ? num(row[iRpp]) : 0,
+      scd,
+      // Rumus persis sesuai instruksi user: Average Sales = (Stock Gudang x 6) / SCD
+      averageSales: scd > 0 ? (totalStock * 6) / scd : 0,
+      divisions: [] // diisi belakangan dari parseEdiStockText(), lihat mergeStockGudangDivisions()
+    });
+  }
+  if (!rows.length) throw new Error("Tidak ada baris data produk valid ditemukan di file Daftar Stock Gudang.");
+  return rows;
+}
+/* Parser "EDI Stock" -- HANYA dipakai utk membangun peta Pcode -> Set
+   Divisi Sales (via kolom GD, dibersihkan dari prefix "731234 - " lalu
+   classifySalesman()). Kolom lain file ini (STOCK, H_JUAL_*, dst) tidak
+   dipakai sama sekali di ribbon Stock, krn data stock per-Pcode yg
+   dipakai sepenuhnya dari "Daftar Stock Gudang". */
+// Pemetaan kode kategori produk (kolom "DIVISI" mentah di EDI Stock,
+// BUKAN divisi sales) -> Divisi Sales final (HANYA 3: M1/MU245/M3).
+// M1 di sini adalah gabungan BIS+CWC (sesuai definisi M1 yg sudah dipakai
+// di LBP/Omset sebelumnya). Kode 11 (INDUSTRIAL) & 19 (FOOD SERVICE)
+// SENGAJA tidak dipetakan (di luar 3 divisi ini per instruksi user).
+const STOCK_CATEGORY_TO_DIVISI = {
+  "01": "M1", "02": "M1", "03": "M1", "04": "M1", "18": "M1", "21": "M1", "23": "M1",
+  "05": "MU245", "06": "MU245", "08": "MU245", "16": "MU245",
+  "10": "M3"
+};
+function parseEdiStockText(text) {
+  const lines = text.split(/\r\n|\r|\n/).filter(l => l.trim().length > 0);
+  if (!lines.length) throw new Error("File EDI Stock kosong.");
+  const header = lines[0].split("|").map(s => unq(s));
+  const idx = name => header.indexOf(name);
+  const iPcode = idx("PCODE"), iGd = idx("GD"), iPcodeName = idx("PCODENAME"), iStock = idx("STOCK"), iDivisi = idx("DIVISI");
+  if (iPcode < 0 || iGd < 0) {
+    throw new Error("Format file EDI Stock tidak dikenali (kolom PCODE/GD tidak ditemukan).");
+  }
+  const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split("|").map(s => unq(s));
+    const pcode = (cols[iPcode] || "").trim();
+    if (!pcode) continue;
+    const gdRaw = (cols[iGd] || "").trim();
+    // Kolom GD kadang berisi kode GUDANG murni (nilai literal "WH01",
+    // "WH02", "WH03"), beda dari baris salesman/kantor. `isWarehouse`
+    // menandai baris jenis ini, dipakai filter GD (Gudang) terpisah dari
+    // Divisi.
+    const gdUpper = gdRaw.toUpperCase();
+    const isWarehouse = /^WH\d+$/.test(gdUpper);
+    // DUA sistem klasifikasi Divisi berjalan BERSAMAAN (union, bukan
+    // saling menggantikan) -- sesuai permintaan user "4 divisi TAPI 3
+    // divisi itu juga tetap ada":
+    // (a) division4 dari kolom GD/salesman via classifySalesman() ->
+    //     BIS/CWC/MU245/M3 (label "MU" dinormalisasi jadi "MU245" biar
+    //     konsisten penamaan dgn sistem kategori). "732726 - BIS-..." ->
+    //     ambil bagian SETELAH " - " pertama dulu sblm classifySalesman(),
+    //     krn fungsi itu ambil prefix SEBELUM "-" pertama.
+    const smPart = gdRaw.includes(" - ") ? gdRaw.split(" - ").slice(1).join(" - ") : gdRaw;
+    const division4Raw = classifySalesman(smPart).division;
+    const division4 = division4Raw === "MU" ? "MU245" : division4Raw; // "UNCLASSIFIED" tetap apa adanya
+    // (b) division3 dari kolom DIVISI (kode kategori PRODUK, mis.
+    //     "02"=Biscuit) -> M1/MU245/M3. Kode di luar peta (mis. 11, 19)
+    //     sengaja dibiarkan UNCLASSIFIED.
+    const divisiKode = iDivisi >= 0 ? (cols[iDivisi] || "").trim() : "";
+    const division3 = STOCK_CATEGORY_TO_DIVISI[divisiKode] || "UNCLASSIFIED";
+    rows.push({
+      pcode, pcodeName: iPcodeName >= 0 ? (cols[iPcodeName] || "").trim() : "",
+      stock: iStock >= 0 ? num(cols[iStock]) : 0,
+      gd: gdRaw, gdUpper, isWarehouse, divisiKode, division4, division3
+    });
+  }
+  return rows;
+}
+/* Gabungkan hasil parseEdiStockText() ke dalam rows Daftar Stock Gudang
+   -- isi field `divisions` dgn UNION dari 2 sistem klasifikasi sekaligus
+   (bukan saling menggantikan, sesuai permintaan user "4 divisi TAPI 3
+   divisi itu tetap ada"):
+   (a) division4 dari GD/salesman -> BIS/CWC/MU245/M3 (many-to-many,
+       satu Pcode bisa dipegang salesman dari beberapa divisi berbeda)
+   (b) division3 dari kolom DIVISI/kategori produk -> M1/MU245/M3
+       (selalu tunggal per Pcode, konsisten di semua barisnya)
+   Satu Pcode bisa berakhir dgn SAMPAI 5 label sekaligus di `divisions`
+   (mis. ["BIS","CWC","MU245","M3","M1"]) tergantung apa yg cocok dari
+   kedua sistem -- ini disengaja, bukan bug, krn keduanya independen.
+   Dipanggil ulang tiap salah satu dari 2 sumber data berubah (upload
+   baru), supaya relasi selalu konsisten dgn data TERBARU kedua file. */
+function mergeStockGudangDivisions() {
+  const map = new Map(); // pcode -> Set(division)
+  DB.ediStock.forEach(r => {
+    if (!map.has(r.pcode)) map.set(r.pcode, new Set());
+    const set = map.get(r.pcode);
+    if (r.division4 !== "UNCLASSIFIED") set.add(r.division4);
+    if (r.division3 !== "UNCLASSIFIED") set.add(r.division3);
+  });
+  DB.stockGudang.forEach(r => { r.divisions = [...(map.get(r.pcode) || new Set())]; });
+}
 /* Daftar semua Tgl Proses unik yang ada di file (utk dropdown pilihan). */
 function agingStockAllTglProses() {
   return [...new Set(DB.agingStock.map(r => r.tglProses))].filter(Boolean).sort().reverse();
@@ -7322,6 +7630,115 @@ function agingStockFilteredRows() {
   const q = agingStockPcodeSearch.query.trim().toLowerCase();
   if (q.length < 2) return base;
   return base.filter(r => r.pcode.toLowerCase().includes(q) || r.namaBarang.toLowerCase().includes(q));
+}
+
+/* =========================================================================
+   RIBBON WAREHOUSE > STOCK -- fungsi data (filter, KPI, Top 20, rata2
+   per divisi). Data dasarnya DB.stockGudang, field `divisions` sudah
+   diisi mergeStockGudangDivisions() saat salah satu dari 2 file diupload.
+   ========================================================================= */
+const stockFilter = { divisi: "ALL" }; // "ALL" | "BIS" | "CWC" | "MU" | "M3"
+// Filter Gudang (GD) -- WH01 = tampilan lengkap (Daftar Stock Gudang +
+// Divisi dari EDI Stock, spt sudah dibangun); WH02/WH03 = tampilan
+// sederhana (Pcode, Pcode Name, Stock -- satu angka total, LANGSUNG dari
+// EDI Stock, tanpa SCD/RPP/pecahan Besar-Tengah-Kecil krn tidak ada di
+// sumber data). Default WH01 krn itu tampilan utama yg plg sering dipakai.
+const stockGdFilter = { gd: "WH01" };
+// Pencarian Pcode/Nama Produk -- dipakai KEDUA tabel (Detail WH01 & tabel
+// sederhana WH02/WH03), state terpisah krn tabelnya independen.
+const stockDetailSearch = { query: "" };
+const stockWhSimpleSearch = { query: "" };
+// Drill-down klik baris di "Ringkasan Stock" -- metric: null (blm ada yg
+// diklik) | "totalStock" | "onCust" | "realStock". Menampilkan daftar
+// Pcode + Nama + jumlah utk metric itu (SEMUA ukuran BSR+TGH+KCL
+// dijumlah jadi satu angka per Pcode, konsisten dgn kolom "Total" di
+// Ringkasan Stock yg diklik user).
+const stockRingkasanDrilldown = { metric: null };
+/* Baris terfilter oleh divisi yg dipilih -- kalau "ALL", semua baris
+   dikembalikan; kalau divisi spesifik, HANYA Pcode yg divisions-nya
+   MENCAKUP divisi itu (satu Pcode bisa lolos filter BIS maupun MU
+   sekaligus kalau dipegang keduanya -- ini disengaja/many-to-many).
+   Baris dgn totalStock = 0 SELALU disingkirkan (permintaan eksplisit:
+   "untuk WH01 jika stocknya 0 tidak usah ditampilkan") -- ini di level
+   PALING DASAR shg otomatis konsisten di semua turunan (KPI, Top 20,
+   rata2 per divisi, tabel detail) tanpa perlu diulang di tiap fungsi. */
+function stockFilteredRows() {
+  const nonZero = DB.stockGudang.filter(r => r.totalStock !== 0);
+  if (stockFilter.divisi === "ALL") return nonZero;
+  return nonZero.filter(r => r.divisions.includes(stockFilter.divisi));
+}
+/* Tampilan sederhana WH02/WH03 -- LANGSUNG dari EDI Stock, filter GD
+   exact match (case-insensitive), tanpa join ke Daftar Stock Gudang
+   sama sekali. Satu Pcode HARUSNYA cuma muncul sekali per Gudang (tidak
+   di-dedup lagi krn data mentahnya memang granular per baris GD). */
+function stockWhSimpleRows(gd) {
+  return DB.ediStock
+    .filter(r => r.isWarehouse && r.gdUpper === gd.toUpperCase())
+    .map(r => ({ pcode: r.pcode, pcodeName: r.pcodeName, stock: r.stock }))
+    .sort((a, b) => a.pcode.localeCompare(b.pcode));
+}
+function stockKpi() {
+  const rows = stockFilteredRows();
+  const sum = (f) => rows.reduce((s, r) => s + r[f], 0);
+  const scdVals = rows.filter(r => r.scd > 0).map(r => r.scd);
+  const avgSalesVals = rows.map(r => r.averageSales);
+  // KPI ke-8: Pcode dgn SCD tertinggi & terendah (mengikuti filter yg
+  // sama, termasuk Filter Divisi -- krn keduanya dihitung dari `rows`
+  // yg sudah difilter, bukan dari DB.stockGudang mentah). SCD=0 (stock
+  // kosong/tak terhitung) dikecualikan dari "terendah" spt di Top 20,
+  // supaya tidak semua nol mendominasi & tetap valid dihitung tertinggi.
+  const scdSorted = rows.filter(r => r.scd > 0).slice().sort((a, b) => a.scd - b.scd);
+  const scdTertinggi = rows.length ? rows.slice().sort((a, b) => b.scd - a.scd)[0] : null;
+  const scdTerendah = scdSorted.length ? scdSorted[0] : null;
+  return {
+    jumlahPcode: rows.length,
+    totalStokBsr: sum("stokBsr"), totalStokTgh: sum("stokTgh"), totalStokKcl: sum("stokKcl"),
+    totalStock: sum("totalStock"),
+    totalOcBsr: sum("ocBsr"), totalOcTgh: sum("ocTgh"), totalOcKcl: sum("ocKcl"),
+    totalOnCust: sum("totalOnCust"),
+    totalRealBsr: sum("realBsr"), totalRealTgh: sum("realTgh"), totalRealKcl: sum("realKcl"),
+    totalRealStock: sum("realTotal"),
+    totalRpp13: sum("rpp13"),
+    avgScd: scdVals.length ? scdVals.reduce((a, b) => a + b, 0) / scdVals.length : 0,
+    avgSalesTotal: sum("averageSales"),
+    // Rata-rata Average Sales PER Pcode (bukan jumlah total) -- KPI ke-7
+    avgSalesPerPcode: avgSalesVals.length ? avgSalesVals.reduce((a, b) => a + b, 0) / avgSalesVals.length : 0,
+    scdTertinggi, scdTerendah
+  };
+}
+/* Top 20 SCD tertinggi/terendah -- SCD=0 (tak terhitung, biasanya krn
+   stock kosong) DIKELUARKAN dari "terendah" supaya tidak semua nol
+   mendominasi; tetap dihitung di "tertinggi" krn nilai tinggi selalu valid. */
+function stockTop20Scd(mode) {
+  const rows = stockFilteredRows();
+  if (mode === "tertinggi") return rows.slice().sort((a, b) => b.scd - a.scd).slice(0, 20);
+  return rows.filter(r => r.scd > 0).sort((a, b) => a.scd - b.scd).slice(0, 20);
+}
+function stockTop20Average(mode) {
+  const rows = stockFilteredRows();
+  if (mode === "tertinggi") return rows.slice().sort((a, b) => b.averageSales - a.averageSales).slice(0, 20);
+  return rows.filter(r => r.averageSales > 0).sort((a, b) => a.averageSales - b.averageSales).slice(0, 20);
+}
+/* Rata-rata Average Sales per Divisi -- SEKARANG menampilkan 5 divisi
+   sekaligus: 4 divisi sales dari GD/salesman (BIS/CWC/MU245/M3) DITAMBAH
+   3 divisi dari kategori produk (M1/MU245/M3, "MU245" & "M3" tumpang
+   tindih nama dgn yg dari GD tapi tetap dihitung sbg divisi terpisah
+   secara konseptual -- keduanya independen). Satu Pcode bisa masuk
+   hitungan BEBERAPA divisi sekaligus (many-to-many by design, lihat
+   mergeStockGudangDivisions()). */
+function stockAvgPerDivisi() {
+  const divs = ["BIS", "CWC", "MU245", "M3", "M1"];
+  return divs.map(d => {
+    const rows = DB.stockGudang.filter(r => r.divisions.includes(d));
+    const avgVals = rows.map(r => r.averageSales);
+    const scdVals = rows.filter(r => r.scd > 0).map(r => r.scd);
+    return {
+      divisi: d,
+      jumlahPcode: rows.length,
+      avgSales: avgVals.length ? avgVals.reduce((a, b) => a + b, 0) / avgVals.length : 0,
+      avgScd: scdVals.length ? scdVals.reduce((a, b) => a + b, 0) / scdVals.length : 0
+    };
+  }).filter(d => d.jumlahPcode > 0);
 }
 
 /* Parser format TEKS pipe-delimited (data mentah ASLI hasil extract
@@ -11804,6 +12221,268 @@ function renderAgingStockDependent() {
   renderAgingStockReportTable();
 }
 
+/* =========================================================================
+   RIBBON WAREHOUSE > STOCK -- render functions
+   ========================================================================= */
+function renderStockKpiRow() {
+  const wrap = document.getElementById("stockKpiRow");
+  if (!wrap) return;
+  const k = stockKpi();
+  wrap.innerHTML = `
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("box")}</div>
+      <div class="body"><div class="label">Jumlah Pcode</div><div class="value">${fmtInt(k.jumlahPcode)}</div>
+        <div class="sub">${stockFilter.divisi === "ALL" ? "Semua divisi" : "Divisi " + stockFilter.divisi}</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("box")}</div>
+      <div class="body"><div class="label">Total Stock</div><div class="value">${fmtNum(k.totalStock, 0)}</div>
+        <div class="sub">BSR ${fmtNum(k.totalStokBsr, 0)} · TGH ${fmtNum(k.totalStokTgh, 0)} · KCL ${fmtNum(k.totalStokKcl, 0)}</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("truck")}</div>
+      <div class="body"><div class="label">Total On Cust</div><div class="value">${fmtNum(k.totalOnCust, 0)}</div>
+        <div class="sub">BSR ${fmtNum(k.totalOcBsr, 0)} · TGH ${fmtNum(k.totalOcTgh, 0)} · KCL ${fmtNum(k.totalOcKcl, 0)}</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("store")}</div>
+      <div class="body"><div class="label">Total Real Stock</div><div class="value">${fmtNum(k.totalRealStock, 0)}</div>
+        <div class="sub">Total Stock − On Cust</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("calendar")}</div>
+      <div class="body"><div class="label">Rata-rata SCD</div><div class="value">${fmtNum(k.avgScd, 1)} hari</div>
+        <div class="sub">Stock Cover Day</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("chart")}</div>
+      <div class="body"><div class="label">Total RPP 13 Pekan</div><div class="value">${fmtNum(k.totalRpp13, 0)}</div>
+        <div class="sub">Rencana Penjualan Periode</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("chart")}</div>
+      <div class="body"><div class="label">Rata-rata Average Sales</div><div class="value">${fmtNum(k.avgSalesPerPcode, 2)}</div>
+        <div class="sub">Rata-rata per Pcode</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("warn")}</div>
+      <div class="body"><div class="label">Pcode SCD Tertinggi & Terendah</div>
+        <div class="value" style="font-size:14px; line-height:1.4;">
+          🔴 ${k.scdTertinggi ? `${k.scdTertinggi.pcode} — ${fmtNum(k.scdTertinggi.scd, 1)} hari` : "-"}<br>
+          🟢 ${k.scdTerendah ? `${k.scdTerendah.pcode} — ${fmtNum(k.scdTerendah.scd, 1)} hari` : "-"}
+        </div>
+        <div class="sub">${stockFilter.divisi === "ALL" ? "Semua divisi" : "Divisi " + stockFilter.divisi}</div></div>
+    </div>`;
+}
+function renderStockRingkasan() {
+  const wrap = document.getElementById("stockRingkasanWrap");
+  if (!wrap) return;
+  const k = stockKpi();
+  const rowCls = (metric) => `stock-ringkasan-row${stockRingkasanDrilldown.metric === metric ? " active" : ""}`;
+  wrap.innerHTML = `
+    <table class="ar-table prestasi-table">
+      <thead><tr><th></th><th style="text-align:right;">Besar</th><th style="text-align:right;">Tengah</th><th style="text-align:right;">Kecil</th><th style="text-align:right;">Total</th></tr></thead>
+      <tbody>
+        <tr class="${rowCls("totalStock")}" data-metric="totalStock" style="cursor:pointer;"><td>Total Stock</td><td style="text-align:right;">${fmtNum(k.totalStokBsr, 0)}</td><td style="text-align:right;">${fmtNum(k.totalStokTgh, 0)}</td><td style="text-align:right;">${fmtNum(k.totalStokKcl, 0)}</td><td style="text-align:right; font-weight:800;">${fmtNum(k.totalStock, 0)}</td></tr>
+        <tr class="${rowCls("onCust")}" data-metric="onCust" style="cursor:pointer;"><td>On Cust Order</td><td style="text-align:right;">${fmtNum(k.totalOcBsr, 0)}</td><td style="text-align:right;">${fmtNum(k.totalOcTgh, 0)}</td><td style="text-align:right;">${fmtNum(k.totalOcKcl, 0)}</td><td style="text-align:right; font-weight:800;">${fmtNum(k.totalOnCust, 0)}</td></tr>
+        <tr class="${rowCls("realStock")}" data-metric="realStock" style="cursor:pointer; border-top:2px solid var(--line);"><td style="font-weight:800;">Real Stock</td><td style="text-align:right; font-weight:800;">${fmtNum(k.totalRealBsr, 0)}</td><td style="text-align:right; font-weight:800;">${fmtNum(k.totalRealTgh, 0)}</td><td style="text-align:right; font-weight:800;">${fmtNum(k.totalRealKcl, 0)}</td><td style="text-align:right; font-weight:800;">${fmtNum(k.totalRealStock, 0)}</td></tr>
+      </tbody>
+    </table>
+    <div style="font-size:11px; color:var(--sub); margin-top:6px;">💡 Klik salah satu baris untuk lihat rincian per Pcode.</div>`;
+  wrap.querySelectorAll("tr[data-metric]").forEach(tr => {
+    tr.addEventListener("click", () => {
+      const m = tr.getAttribute("data-metric");
+      stockRingkasanDrilldown.metric = stockRingkasanDrilldown.metric === m ? null : m;
+      renderStockRingkasan();
+      renderStockRingkasanDrilldownTable();
+    });
+  });
+}
+/* Tabel rincian per Pcode utk metric yg diklik di Ringkasan Stock --
+   totalStock/onCust/realStock masing2 dijumlah dari 3 ukuran (BSR+TGH+
+   KCL) jadi SATU angka per Pcode, diurutkan dari yg terbesar. Baris dgn
+   nilai 0 utk metric ini disingkirkan (mis. klik "On Cust" -> Pcode yg
+   On Cust-nya nol tidak relevan ditampilkan). */
+function renderStockRingkasanDrilldownTable() {
+  const wrap = document.getElementById("stockRingkasanDrilldown");
+  if (!wrap) return;
+  const metric = stockRingkasanDrilldown.metric;
+  if (!metric) { wrap.innerHTML = ""; return; }
+  const fieldMap = { totalStock: "totalStock", onCust: "totalOnCust", realStock: "realTotal" };
+  const labelMap = { totalStock: "Total Stock", onCust: "On Cust Order", realStock: "Real Stock" };
+  const field = fieldMap[metric];
+  const rows = stockFilteredRows()
+    .map(r => ({ pcode: r.pcode, namaProduk: r.namaProduk, jumlah: r[field] }))
+    .filter(r => r.jumlah !== 0)
+    .sort((a, b) => b.jumlah - a.jumlah);
+  wrap.innerHTML = `
+    <div class="card" style="margin-top:8px; border-color:var(--accent);">
+      <div class="card-top"><div class="titles"><h3 style="font-size:14px;">🔍 Rincian per Pcode — ${labelMap[metric]}</h3><div class="desc">${fmtInt(rows.length)} Pcode dengan ${labelMap[metric]} &gt; 0</div></div></div>
+      <div style="max-height:400px; overflow:auto; margin-top:8px;">
+        <table class="ar-table prestasi-table">
+          <thead><tr><th>No</th><th>Pcode</th><th>Nama Produk</th><th style="text-align:right;">${labelMap[metric]}</th></tr></thead>
+          <tbody>
+            ${rows.map((r, i) => `<tr><td>${i + 1}</td><td>${r.pcode}</td><td>${r.namaProduk}</td><td style="text-align:right;">${fmtNum(r.jumlah, 0)}</td></tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+function renderStockTop20ScdChart(mode) {
+  const chartKey = mode === "tertinggi" ? "stockTop20ScdHigh" : "stockTop20ScdLow";
+  destroyChart(chartKey);
+  const canvasId = "chart-" + chartKey;
+  const list = stockTop20Scd(mode);
+  if (ensureEmptyState(canvasId, list.length === 0)) return;
+  CHARTS[chartKey] = new Chart(document.getElementById(canvasId), {
+    type: "bar",
+    data: { labels: list.map(o => `${o.pcode} — ${o.namaProduk}`), datasets: [{
+      label: "SCD (hari)", data: list.map(o => o.scd),
+      backgroundColor: mode === "tertinggi" ? SEM.red : SEM.green, borderRadius: 7
+    }] },
+    options: styledOpts({
+      indexAxis: "y",
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${fmtNum(ctx.parsed.x, 1)} hari` } } },
+      scales: {
+        x: { ticks: { color: textColor(), font: { size: 10 } }, grid: { color: gridColor() }, beginAtZero: true },
+        y: { ticks: { color: textColor(), font: { size: 9 } }, grid: { display: false } }
+      }
+    })
+  });
+}
+function renderStockTop20AvgChart(mode) {
+  const chartKey = mode === "tertinggi" ? "stockTop20AvgHigh" : "stockTop20AvgLow";
+  destroyChart(chartKey);
+  const canvasId = "chart-" + chartKey;
+  const list = stockTop20Average(mode);
+  if (ensureEmptyState(canvasId, list.length === 0)) return;
+  CHARTS[chartKey] = new Chart(document.getElementById(canvasId), {
+    type: "bar",
+    data: { labels: list.map(o => `${o.pcode} — ${o.namaProduk}`), datasets: [{
+      label: "Average Sales", data: list.map(o => o.averageSales),
+      backgroundColor: mode === "tertinggi" ? SEM.red : SEM.green, borderRadius: 7
+    }] },
+    options: styledOpts({
+      indexAxis: "y",
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${fmtNum(ctx.parsed.x, 2)}` } } },
+      scales: {
+        x: { ticks: { color: textColor(), font: { size: 10 } }, grid: { color: gridColor() }, beginAtZero: true },
+        y: { ticks: { color: textColor(), font: { size: 9 } }, grid: { display: false } }
+      }
+    })
+  });
+}
+function renderStockAvgDivisi() {
+  const wrap = document.getElementById("stockAvgDivisiWrap");
+  if (!wrap) return;
+  const list = stockAvgPerDivisi();
+  if (!list.length) { wrap.innerHTML = '<div class="exec-empty">Belum ada data Divisi — upload file EDI Stock terlebih dahulu.</div>'; return; }
+  wrap.innerHTML = `
+    <table class="ar-table prestasi-table">
+      <thead><tr><th>No</th><th>Divisi</th><th style="text-align:right;">Jumlah Pcode</th><th style="text-align:right;">Rata-rata Average Sales</th><th style="text-align:right;">Rata-rata SCD (hari)</th></tr></thead>
+      <tbody>
+        ${list.map((d, i) => `<tr>
+          <td>${i + 1}</td>
+          <td><span class="chip" style="background:${DIV_ALL_COLORS[d.divisi]}22; border:1px solid ${DIV_ALL_COLORS[d.divisi]}; color:${DIV_ALL_COLORS[d.divisi]}; font-weight:700;">${d.divisi}</span></td>
+          <td style="text-align:right;">${fmtInt(d.jumlahPcode)}</td>
+          <td style="text-align:right;">${fmtNum(d.avgSales, 2)}</td>
+          <td style="text-align:right;">${fmtNum(d.avgScd, 1)}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+function renderStockDetail() {
+  const wrap = document.getElementById("stockDetailWrap");
+  const countEl = document.getElementById("stockDetailSearchCount");
+  if (!wrap) return;
+  const allRows = stockFilteredRows();
+  const q = stockDetailSearch.query.trim().toLowerCase();
+  const rows = q ? allRows.filter(r => r.pcode.toLowerCase().includes(q) || r.namaProduk.toLowerCase().includes(q)) : allRows;
+  if (countEl) countEl.textContent = q ? `${fmtInt(rows.length)} dari ${fmtInt(allRows.length)} Pcode cocok dengan "${stockDetailSearch.query}"` : `${fmtInt(allRows.length)} Pcode`;
+  if (!allRows.length) { wrap.innerHTML = '<div class="exec-empty">Belum ada data. Upload file Daftar Stock Gudang terlebih dahulu.</div>'; return; }
+  if (!rows.length) { wrap.innerHTML = '<div class="exec-empty">Tidak ada Pcode yang cocok dengan pencarian.</div>'; return; }
+  wrap.innerHTML = `
+    <table class="ar-table prestasi-table">
+      <thead><tr>
+        <th>No</th><th>Pcode</th><th>Nama Produk</th>
+        <th style="text-align:right;">Stok BSR</th><th style="text-align:right;">Stok TGH</th><th style="text-align:right;">Stok KCL</th><th style="text-align:right;">Total Stock</th>
+        <th style="text-align:right;">On Cust BSR</th><th style="text-align:right;">On Cust TGH</th><th style="text-align:right;">On Cust KCL</th>
+        <th style="text-align:right;">Real BSR</th><th style="text-align:right;">Real TGH</th><th style="text-align:right;">Real KCL</th><th style="text-align:right;">Real Stock</th>
+        <th style="text-align:right;">RPP 13 Pekan</th><th style="text-align:right;">SCD</th><th style="text-align:right;">Average Sales</th><th>Divisi</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map((r, i) => `<tr>
+          <td>${i + 1}</td><td>${r.pcode}</td><td>${r.namaProduk}</td>
+          <td style="text-align:right;">${fmtNum(r.stokBsr, 0)}</td><td style="text-align:right;">${fmtNum(r.stokTgh, 0)}</td><td style="text-align:right;">${fmtNum(r.stokKcl, 0)}</td><td style="text-align:right; font-weight:700;">${fmtNum(r.totalStock, 0)}</td>
+          <td style="text-align:right;">${fmtNum(r.ocBsr, 0)}</td><td style="text-align:right;">${fmtNum(r.ocTgh, 0)}</td><td style="text-align:right;">${fmtNum(r.ocKcl, 0)}</td>
+          <td style="text-align:right;">${fmtNum(r.realBsr, 0)}</td><td style="text-align:right;">${fmtNum(r.realTgh, 0)}</td><td style="text-align:right;">${fmtNum(r.realKcl, 0)}</td><td style="text-align:right; font-weight:700;">${fmtNum(r.realTotal, 0)}</td>
+          <td style="text-align:right;">${fmtNum(r.rpp13, 2)}</td><td style="text-align:right;">${fmtNum(r.scd, 1)}</td><td style="text-align:right;">${fmtNum(r.averageSales, 2)}</td>
+          <td>${r.divisions.length ? r.divisions.join(", ") : "-"}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+function renderStockWhSimple() {
+  const kpiWrap = document.getElementById("stockWhSimpleKpiRow");
+  const wrap = document.getElementById("stockWhSimpleWrap");
+  const titleEl = document.getElementById("stockWhSimpleTitle");
+  if (!wrap) return;
+  const gd = stockGdFilter.gd;
+  if (titleEl) titleEl.textContent = `📄 Pcode di ${gd}`;
+  const rows = stockWhSimpleRows(gd);
+  if (kpiWrap) {
+    const totalStock = rows.reduce((s, r) => s + r.stock, 0);
+    kpiWrap.innerHTML = `
+      <div class="card kpi-card">
+        <div class="icon-circle">${ico("box")}</div>
+        <div class="body"><div class="label">Jumlah Pcode di ${gd}</div><div class="value">${fmtInt(rows.length)}</div></div>
+      </div>
+      <div class="card kpi-card">
+        <div class="icon-circle">${ico("box")}</div>
+        <div class="body"><div class="label">Total Stock (${gd})</div><div class="value">${fmtNum(totalStock, 0)}</div></div>
+      </div>`;
+  }
+  if (!rows.length) { wrap.innerHTML = `<div class="exec-empty">Belum ada data untuk ${gd}. Upload file EDI Stock terlebih dahulu.</div>`; return; }
+  const countEl = document.getElementById("stockWhSimpleSearchCount");
+  const q = stockWhSimpleSearch.query.trim().toLowerCase();
+  const filtered = q ? rows.filter(r => r.pcode.toLowerCase().includes(q) || r.pcodeName.toLowerCase().includes(q)) : rows;
+  if (countEl) countEl.textContent = q ? `${fmtInt(filtered.length)} dari ${fmtInt(rows.length)} Pcode cocok dengan "${stockWhSimpleSearch.query}"` : `${fmtInt(rows.length)} Pcode`;
+  if (!filtered.length) { wrap.innerHTML = '<div class="exec-empty">Tidak ada Pcode yang cocok dengan pencarian.</div>'; return; }
+  wrap.innerHTML = `
+    <table class="ar-table prestasi-table">
+      <thead><tr><th>No</th><th>Pcode</th><th>Nama Produk</th><th style="text-align:right;">Stock</th></tr></thead>
+      <tbody>
+        ${filtered.map((r, i) => `<tr><td>${i + 1}</td><td>${r.pcode}</td><td>${r.pcodeName}</td><td style="text-align:right;">${fmtNum(r.stock, 0)}</td></tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+/* GD (Gudang) menentukan tampilan MANA yg dipakai -- WH01 = section
+   lengkap (KPI, Ringkasan, Top20 SCD/Average, per Divisi, Detail);
+   WH02/WH03 = section sederhana (Pcode+Nama+Stock saja). Kedua section
+   di-toggle display:none/"" sesuai pilihan, supaya CHART_REGISTRY tetap
+   bisa render keduanya (dipakai saat export PDF captureChartImage
+   membuka card yg sedang tersembunyi) tanpa index kartu berubah-ubah. */
+function renderStockDependent() {
+  const isWh01 = stockGdFilter.gd === "WH01";
+  const wh01Section = document.getElementById("stockWh01Section");
+  const simpleSection = document.getElementById("stockWhSimpleSection");
+  if (wh01Section) wh01Section.style.display = isWh01 ? "" : "none";
+  if (simpleSection) simpleSection.style.display = isWh01 ? "none" : "";
+  if (isWh01) {
+    renderStockKpiRow();
+    renderStockRingkasan();
+    renderStockRingkasanDrilldownTable();
+    renderStockTop20ScdChart("tertinggi");
+    renderStockTop20ScdChart("terendah");
+    renderStockTop20AvgChart("tertinggi");
+    renderStockTop20AvgChart("terendah");
+    renderStockAvgDivisi();
+    renderStockDetail();
+  } else {
+    renderStockWhSimple();
+  }
+}
+
 /* ---- Render: Utilisasi MyDex ---- */
 /* Gabungan KPI utama (4) + Analisis Mendalam Kendaraan (6) = 10 indikator
    dalam SATU grid 5-kolom. Kalau filter NOPOL = "ALL", deep-dive dihitung
@@ -13978,6 +14657,7 @@ function renderAll() {
   renderPrestasiDependent();
   renderSendingDependent();
   renderAgingStockDependent();
+  renderStockDependent();
   renderMydexDependent();
   renderAllGenericDetails();
 }
@@ -14011,6 +14691,8 @@ function handleFile(target, file) {
   if (target === "prestasi") { handlePrestasiFile(file); return; }
   if (target === "sending") { handleSendingFile(file); return; }
   if (target === "agingstock") { handleAgingStockFile(file); return; }
+  if (target === "stockgudang") { handleStockGudangFile(file); return; }
+  if (target === "edistock") { handleEdiStockFile(file); return; }
   if (target === "mydex") { handleMydexFile(file); return; }
   showProgress("Membaca file...");
   const reader = new FileReader();
@@ -14445,6 +15127,56 @@ function handleAgingStockFile(file) {
       } catch (err) {
         console.error(err);
         showToast("Gagal memproses file Aging Stock: " + err.message, "error");
+      } finally { hideProgress(); }
+    }, 30));
+  };
+  reader.onerror = () => { hideProgress(); showToast("Gagal membaca file.", "error"); };
+  reader.readAsArrayBuffer(file);
+}
+function handleStockGudangFile(file) {
+  showProgress("Membaca file Daftar Stock Gudang...");
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    requestAnimationFrame(() => setTimeout(() => {
+      try {
+        const buf = new Uint8Array(e.target.result);
+        const rows = parseStockGudangWorkbook(buf);
+        DB.stockGudang = rows;
+        mergeStockGudangDivisions();
+        stockFilter.divisi = "ALL";
+        const s = document.getElementById("stockDivisiSelect"); if (s) s.value = "ALL";
+        setUploadStatus("stockgudang", `<b>${file.name}</b><br>${fmtInt(rows.length)} Pcode${DB.ediStock.length ? "" : " • upload juga EDI Stock utk info Divisi"}`, true);
+        renderStockDependent();
+        showToast(`Berhasil memuat ${file.name}`, "success");
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal memproses file Daftar Stock Gudang: " + err.message, "error");
+      } finally { hideProgress(); }
+    }, 30));
+  };
+  reader.onerror = () => { hideProgress(); showToast("Gagal membaca file.", "error"); };
+  reader.readAsArrayBuffer(file);
+}
+function handleEdiStockFile(file) {
+  showProgress("Membaca file EDI Stock...");
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    requestAnimationFrame(() => setTimeout(() => {
+      try {
+        const buf = new Uint8Array(e.target.result);
+        let text;
+        if (buf.length >= 3 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF) text = new TextDecoder("utf-8").decode(buf.slice(3));
+        else if (buf.length >= 2 && buf[0] === 0xFF && buf[1] === 0xFE) text = new TextDecoder("utf-16le").decode(buf.slice(2));
+        else text = new TextDecoder("utf-8").decode(buf);
+        const rows = parseEdiStockText(text);
+        DB.ediStock = rows;
+        mergeStockGudangDivisions();
+        setUploadStatus("edistock", `<b>${file.name}</b><br>${fmtInt(rows.length)} baris • ${fmtInt(new Set(rows.map(r => r.pcode)).size)} Pcode unik`, true);
+        renderStockDependent();
+        showToast(`Berhasil memuat ${file.name}`, "success");
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal memproses file EDI Stock: " + err.message, "error");
       } finally { hideProgress(); }
     }, 30));
   };
@@ -14922,6 +15654,14 @@ function resetAllData() {
   const agingStockPcodeListReset = document.getElementById("agingStockPcodeList"); if (agingStockPcodeListReset) agingStockPcodeListReset.innerHTML = "";
   const agingStockTglProsesReset = document.getElementById("agingStockTglProsesSelect"); if (agingStockTglProsesReset) agingStockTglProsesReset.innerHTML = "";
   setUploadStatus("agingstock", "Belum ada data", false);
+  DB.stockGudang = []; DB.ediStock = []; stockFilter.divisi = "ALL"; stockGdFilter.gd = "WH01";
+  stockDetailSearch.query = ""; stockWhSimpleSearch.query = ""; stockRingkasanDrilldown.metric = null;
+  const stockDivisiReset = document.getElementById("stockDivisiSelect"); if (stockDivisiReset) stockDivisiReset.value = "ALL";
+  const stockGdReset = document.getElementById("stockGdSelect"); if (stockGdReset) stockGdReset.value = "WH01";
+  const stockDetailSearchReset = document.getElementById("stockDetailSearchInput"); if (stockDetailSearchReset) stockDetailSearchReset.value = "";
+  const stockWhSimpleSearchReset = document.getElementById("stockWhSimpleSearchInput"); if (stockWhSimpleSearchReset) stockWhSimpleSearchReset.value = "";
+  setUploadStatus("stockgudang", "Belum ada data", false);
+  setUploadStatus("edistock", "Belum ada data", false);
   DB.mydex = []; mydexFilter.start = ""; mydexFilter.end = ""; mydexVehicleFilter.nomobil = "ALL";
   mydexChartMode.mode = "scan"; mydexTableMode.mode = "detail";
   const mydexStartReset = document.getElementById("mydexFltStart"); if (mydexStartReset) mydexStartReset.value = "";
@@ -15077,6 +15817,13 @@ CHART_REGISTRY.push(
   { id: "sendingReportWrap", title: "Laporan Prestasi Sending Salesman", section: "Prestasi Sending" },
   { id: "sendingWorstWrap", title: "Sales Perlu Perhatian", section: "Prestasi Sending" },
   { id: "agingStockReportWrap", title: "Laporan Aging Stock", section: "Aging Stock" },
+  { id: "stockTop20ScdHigh", title: "Top 20 SCD Tertinggi", section: "Stock" },
+  { id: "stockTop20ScdLow", title: "Top 20 SCD Terendah", section: "Stock" },
+  { id: "stockTop20AvgHigh", title: "Top 20 Average Sales Tertinggi", section: "Stock" },
+  { id: "stockTop20AvgLow", title: "Top 20 Average Sales Terendah", section: "Stock" },
+  { id: "stockAvgDivisiWrap", title: "Rata-rata Average Sales per Divisi", section: "Stock" },
+  { id: "stockDetailWrap", title: "Detail Semua Pcode", section: "Stock" },
+  { id: "stockWhSimpleWrap", title: "Pcode per Gudang (WH02/WH03)", section: "Stock" },
   { id: "mydexScanChart", title: "Breakdown Alasan Scan / Channel Toko", section: "Utilisasi MyDex" },
   { id: "mydexReportWrap", title: "Laporan Utilisasi Armada", section: "Utilisasi MyDex" },
   { id: "mydexDetailWrap", title: "Detail Transaksi / Ringkasan RPP", section: "Utilisasi MyDex" }
@@ -15246,6 +15993,13 @@ Object.assign(RENDER_FN, {
   sendingReportWrap: renderSendingReportTable,
   sendingWorstWrap: renderSendingWorstAttendance,
   agingStockReportWrap: renderAgingStockReportTable,
+  stockTop20ScdHigh: () => renderStockTop20ScdChart("tertinggi"),
+  stockTop20ScdLow: () => renderStockTop20ScdChart("terendah"),
+  stockTop20AvgHigh: () => renderStockTop20AvgChart("tertinggi"),
+  stockTop20AvgLow: () => renderStockTop20AvgChart("terendah"),
+  stockAvgDivisiWrap: renderStockAvgDivisi,
+  stockDetailWrap: renderStockDetail,
+  stockWhSimpleWrap: renderStockWhSimple,
   mydexScanChart: renderMydexScanChart,
   mydexReportWrap: renderMydexReportTable,
   mydexDetailWrap: renderMydexDetailTable,
@@ -15360,6 +16114,73 @@ function exportTableToExcel(containerId, filenamePrefix) {
   // "100,0%") rawan sama dgn bug di atas -- konversi sebelum
   // table_to_sheet(). Baris TOTAL (tfoot) sengaja kosong di kedua kolom
   // ini (tidak ada makna "total %"), jadi tidak perlu ditangani khusus.
+  // Kolom desimal (RPP 13 Pekan, SCD, Average Sales) rawan sama dgn bug
+  // di atas -- Excel salah baca "240,46" sbg 24046 kalau tak dibersihkan
+  // dulu. Kolom Stok/On Cust/Real Stock murni bilangan bulat, aman.
+  if (containerId === "stockDetailWrap") {
+    renderStockDetail();
+    const original = document.getElementById(containerId);
+    const table = original ? original.querySelector("table") : null;
+    if (!table) { showToast("Tabel belum ada datanya untuk diexport.", "error"); return; }
+    const clone = table.cloneNode(true);
+    const headerCells = Array.from(clone.querySelectorAll("thead th"));
+    ["RPP 13 Pekan", "SCD", "Average Sales"].forEach(label => {
+      const colIdx = headerCells.findIndex(th => th.textContent.trim() === label);
+      if (colIdx < 0) return;
+      clone.querySelectorAll("tbody tr").forEach(tr => {
+        const td = tr.children[colIdx];
+        if (td) td.textContent = td.textContent.trim().replace(/\./g, "").replace(",", ".");
+      });
+    });
+    clone.style.position = "fixed"; clone.style.left = "-9999px"; clone.style.top = "0";
+    document.body.appendChild(clone);
+    try {
+      const ws = XLSX.utils.table_to_sheet(clone, { raw: false });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Data");
+      const stamp = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `${filenamePrefix}_${stamp}.xlsx`);
+      showToast("Tabel berhasil diexport ke Excel.", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Gagal export tabel: " + err.message, "error");
+    } finally {
+      clone.remove();
+    }
+    return;
+  }
+  if (containerId === "stockAvgDivisiWrap") {
+    renderStockAvgDivisi();
+    const original = document.getElementById(containerId);
+    const table = original ? original.querySelector("table") : null;
+    if (!table) { showToast("Tabel belum ada datanya untuk diexport.", "error"); return; }
+    const clone = table.cloneNode(true);
+    const headerCells = Array.from(clone.querySelectorAll("thead th"));
+    ["Rata-rata Average Sales", "Rata-rata SCD (hari)"].forEach(label => {
+      const colIdx = headerCells.findIndex(th => th.textContent.trim() === label);
+      if (colIdx < 0) return;
+      clone.querySelectorAll("tbody tr").forEach(tr => {
+        const td = tr.children[colIdx];
+        if (td) td.textContent = td.textContent.trim().replace(/\./g, "").replace(",", ".");
+      });
+    });
+    clone.style.position = "fixed"; clone.style.left = "-9999px"; clone.style.top = "0";
+    document.body.appendChild(clone);
+    try {
+      const ws = XLSX.utils.table_to_sheet(clone, { raw: false });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Data");
+      const stamp = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `${filenamePrefix}_${stamp}.xlsx`);
+      showToast("Tabel berhasil diexport ke Excel.", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Gagal export tabel: " + err.message, "error");
+    } finally {
+      clone.remove();
+    }
+    return;
+  }
   if (containerId === "eroArmadaDetailWrap") {
     renderEroArmadaDetailTable();
     const original = document.getElementById(containerId);
@@ -16898,6 +17719,34 @@ function init() {
       renderAgingStockKpiRow();
       buildAgingStockPcodeFilterUI();
       renderAgingStockReportTable();
+    });
+  }
+  const stockGdSelect = document.getElementById("stockGdSelect");
+  if (stockGdSelect) stockGdSelect.addEventListener("change", (e) => {
+    stockGdFilter.gd = e.target.value;
+    renderStockDependent();
+  });
+  const stockDivisiSelect = document.getElementById("stockDivisiSelect");
+  if (stockDivisiSelect) stockDivisiSelect.addEventListener("change", (e) => {
+    stockFilter.divisi = e.target.value;
+    renderStockDependent();
+  });
+  const stockDetailSearchInput = document.getElementById("stockDetailSearchInput");
+  if (stockDetailSearchInput) {
+    let debounce = null;
+    stockDetailSearchInput.addEventListener("input", (e) => {
+      const val = e.target.value;
+      clearTimeout(debounce);
+      debounce = setTimeout(() => { stockDetailSearch.query = val; renderStockDetail(); }, 250);
+    });
+  }
+  const stockWhSimpleSearchInput = document.getElementById("stockWhSimpleSearchInput");
+  if (stockWhSimpleSearchInput) {
+    let debounce2 = null;
+    stockWhSimpleSearchInput.addEventListener("input", (e) => {
+      const val = e.target.value;
+      clearTimeout(debounce2);
+      debounce2 = setTimeout(() => { stockWhSimpleSearch.query = val; renderStockWhSimple(); }, 250);
     });
   }
   const mydexApplyBtn = document.getElementById("mydexBtnApply");

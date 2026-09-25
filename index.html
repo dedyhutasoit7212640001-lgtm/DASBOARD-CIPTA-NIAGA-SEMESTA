@@ -3131,6 +3131,32 @@
       <div class="chart-canvas-wrap" style="height:300px;"><canvas id="chart-inboundProses"></canvas></div>
     </div>
 
+    <!-- ===== Top 10 Pcode Terbanyak/Tersedikit Masuk =====
+         File Inbound tidak punya kolom Pcode terpisah, hanya "Material Name",
+         jadi Nama Material dipakai sbg pengganti "Pcode" pada analisis ini. -->
+    <div class="grid grid-2" style="margin-top:16px;">
+      <div class="card chart-card" data-chart-id="inboundMaterialTop10High" data-chart-title="Inbound - Top 10 Pcode Terbanyak Masuk">
+        <div class="titles"><h3>🔴 Top 10 Pcode Terbanyak Masuk</h3><div class="desc">Berdasarkan Nama Material — total Qty (karton) terbesar, sesuai periode &amp; divisi terfilter</div></div>
+        <div class="chart-canvas-wrap" style="height:360px;"><canvas id="chart-inboundMaterialTop10High"></canvas></div>
+      </div>
+      <div class="card chart-card" data-chart-id="inboundMaterialTop10Low" data-chart-title="Inbound - Top 10 Pcode Tersedikit Masuk">
+        <div class="titles"><h3>🟢 Top 10 Pcode Tersedikit Masuk</h3><div class="desc">Berdasarkan Nama Material — total Qty (karton) terkecil, sesuai periode &amp; divisi terfilter</div></div>
+        <div class="chart-canvas-wrap" style="height:360px;"><canvas id="chart-inboundMaterialTop10Low"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ===== Detail per Pcode/Material ===== -->
+    <div class="card chart-card" data-chart-id="inboundMaterialDetailWrap" data-chart-title="Inbound - Detail per Pcode/Material" style="margin-top:16px;">
+      <div id="chart-inboundMaterialDetailWrap" style="display:none;"></div>
+      <div class="card-top"><div class="titles"><h3>📄 Detail per Pcode/Material</h3><div class="desc">Cari 1 material utk melihat Total Qty (karton) &amp; Total Inbound (jumlah kali masuk), sesuai periode &amp; divisi terfilter</div></div></div>
+      <div class="filterbar" style="margin-bottom:6px;">
+        <div class="field" style="min-width:280px;"><label>Cari Nama Material (Pcode)</label><input type="text" id="inboundMaterialSearchInput" placeholder="mis. TEH PUCUK"></div>
+      </div>
+      <div id="inboundMaterialSearchCount" style="font-size:12px; color:var(--sub); font-weight:700; margin-bottom:6px;"></div>
+      <div class="table-export-row"><button class="table-export-btn" data-export-table="inboundMaterialDetailWrap" data-export-name="Inbound_DetailPcode">⬇️ Excel</button></div>
+      <div id="inboundMaterialDetailWrap" style="max-height:520px; overflow:auto; margin-top:8px;"></div>
+    </div>
+
     <!-- ===== Detail Tabel (paling bawah) ===== -->
     <div class="card chart-card" data-chart-id="inboundDetailWrap" data-chart-title="Inbound - Detail Transaksi" style="margin-top:16px;">
       <div id="chart-inboundDetailWrap" style="display:none;"></div>
@@ -5417,6 +5443,10 @@ const CHARTS = {};
 const showValues = {};
 const filter = { start: "", end: "", reasons: new Set(REASON_ORDER) };
 const inboundFilter = { divGroup: "4", divisi: "ALL", start: "", end: "" }; // divGroup "4"=BIS/CWC/MU245/M3, "3"=M1/MU245/M3
+/* Pencarian pada tabel "Detail per Pcode/Material" -- file Inbound tidak
+   punya kolom Pcode terpisah, hanya "Material Name", jadi Nama Material
+   dipakai sbg pengganti "Pcode" pada analisis ini. */
+const inboundMaterialSearch = { query: "" };
 const DIVISIONS = ["BIS", "CWC", "MU", "M3"];
 const lbpFilter = { divisions: new Set(DIVISIONS) };
 const dimFilter = { sales: "ALL", kecamatan: "ALL", kabupaten: "ALL" };
@@ -5849,6 +5879,32 @@ function inboundDivSummary(rows) {
   });
   const list = Array.from(map.entries()).map(([div, count]) => ({ div, count })).sort((a, b) => b.count - a.count);
   return { list, top: list[0] || null, bottom: list[list.length - 1] || null };
+}
+/* Ringkasan per Material ("Pcode") -- file Inbound tidak punya kolom Pcode
+   terpisah, hanya "Material Name", jadi Nama Material dipakai sbg kunci
+   pengelompokan. totalQty = SUM qty (karton) seluruh baris dgn nama
+   material tsb; totalInbound = COUNT baris (= berapa KALI material itu
+   muncul sbg baris masuk) -- keduanya dihitung dari rows yg SUDAH difilter
+   (periode & divisi yg aktif di ribbon Inbound). */
+function inboundMaterialSummary(rows) {
+  const map = new Map();
+  rows.forEach(r => {
+    const key = r.materialName || "(Tanpa Nama)";
+    if (!map.has(key)) map.set(key, { materialName: key, totalQty: 0, totalInbound: 0 });
+    const o = map.get(key);
+    o.totalQty += r.qty;
+    o.totalInbound++;
+  });
+  return Array.from(map.values());
+}
+/* Top 10 Pcode/Material terbanyak & tersedikit masuk, berdasarkan Total
+   Qty (karton). "Tersedikit" mengecualikan qty=0 supaya tidak didominasi
+   material yg totalnya nol (jarang terjadi tapi tetap dijaga, konsisten
+   dgn pola stockTop20Scd/Average di modul Stock). */
+function inboundMaterialTop10(mode) {
+  const list = inboundMaterialSummary(fInbound());
+  if (mode === "tertinggi") return list.slice().sort((a, b) => b.totalQty - a.totalQty).slice(0, 10);
+  return list.filter(o => o.totalQty > 0).sort((a, b) => a.totalQty - b.totalQty).slice(0, 10);
 }
 /* Rata-rata Lama Antri/Bongkar/Proses -- dihitung dari DOKUMEN UNIK
    (durasi adalah atribut per dokumen/truk, bukan per material, jadi
@@ -12967,12 +13023,12 @@ function renderInboundKpiRow() {
     </div>
     <div class="card kpi-card">
       <div class="icon-circle">${ico("truck")}</div>
-      <div class="body"><div class="label">Rata-rata Lama Muat</div><div class="value">${secToHms(avgDur.avgBongkar)}</div>
+      <div class="body"><div class="label">Rata-rata Lama Bongkar</div><div class="value">${secToHms(avgDur.avgBongkar)}</div>
         <div class="sub">Lama Bongkar/Muat</div></div>
     </div>
     <div class="card kpi-card">
       <div class="icon-circle">${ico("clock")}</div>
-      <div class="body"><div class="label">Rata-rata Lama Proses</div><div class="value">${secToHms(avgDur.avgProses)}</div>
+      <div class="body"><div class="label">Rata-rata Lama Proses (Scan In - Scan Out)</div><div class="value">${secToHms(avgDur.avgProses)}</div>
         <div class="sub">Antri + Muat</div></div>
     </div>
     <div class="card kpi-card">
@@ -13020,6 +13076,55 @@ function renderInboundJumlahKartonChart() {
     })
   });
 }
+function renderInboundMaterialTop10Chart(mode) {
+  const chartKey = mode === "tertinggi" ? "inboundMaterialTop10High" : "inboundMaterialTop10Low";
+  destroyChart(chartKey);
+  const canvasId = "chart-" + chartKey;
+  const list = inboundMaterialTop10(mode);
+  if (ensureEmptyState(canvasId, list.length === 0)) return;
+  CHARTS[chartKey] = new Chart(document.getElementById(canvasId), {
+    type: "bar",
+    data: { labels: list.map(o => o.materialName), datasets: [{
+      label: "Total Qty (karton)", data: list.map(o => o.totalQty),
+      backgroundColor: mode === "tertinggi" ? SEM.red : SEM.green, borderRadius: 7
+    }] },
+    options: styledOpts({
+      indexAxis: "y",
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${fmtInt(ctx.parsed.x)} karton` } } },
+      scales: {
+        x: { ticks: { color: textColor(), font: { size: 10 } }, grid: { color: gridColor() }, beginAtZero: true },
+        y: { ticks: { color: textColor(), font: { size: 9 } }, grid: { display: false } }
+      }
+    })
+  });
+}
+function renderInboundMaterialDetailTable() {
+  const wrap = document.getElementById("inboundMaterialDetailWrap");
+  const countEl = document.getElementById("inboundMaterialSearchCount");
+  if (!wrap) return;
+  const allRows = inboundMaterialSummary(fInbound()).sort((a, b) => b.totalQty - a.totalQty);
+  const q = inboundMaterialSearch.query.trim().toLowerCase();
+  const rows = q ? allRows.filter(r => r.materialName.toLowerCase().includes(q)) : allRows;
+  if (countEl) countEl.textContent = q
+    ? `${fmtInt(rows.length)} dari ${fmtInt(allRows.length)} material cocok dengan "${inboundMaterialSearch.query}"`
+    : `${fmtInt(allRows.length)} material`;
+  if (!allRows.length) { wrap.innerHTML = '<div class="exec-empty">Belum ada data untuk filter saat ini.</div>'; return; }
+  if (!rows.length) { wrap.innerHTML = '<div class="exec-empty">Tidak ada material yang cocok dengan pencarian.</div>'; return; }
+  wrap.innerHTML = `
+    <table class="ar-table prestasi-table">
+      <thead><tr>
+        <th>No</th><th>Pcode (Nama Material)</th>
+        <th style="text-align:right;">Total Qty (Karton)</th><th style="text-align:right;">Total Inbound (kali)</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map((r, i) => `<tr>
+          <td>${i + 1}</td><td>${r.materialName}</td>
+          <td style="text-align:right; font-weight:700;">${fmtInt(r.totalQty)}</td>
+          <td style="text-align:right;">${fmtInt(r.totalInbound)}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
 function renderInboundDetailTable() {
   const wrap = document.getElementById("inboundDetailWrap");
   if (!wrap) return;
@@ -13030,9 +13135,9 @@ function renderInboundDetailTable() {
   const sorted = rows.slice().sort((a, b) => a.date.localeCompare(b.date) || a.docNo.localeCompare(b.docNo));
   wrap.innerHTML = `
     <div style="margin-bottom:10px; font-size:12px; color:var(--sub);">
-      Rata-rata Lama Muat: <b style="color:var(--text);">${secToHms(avgDur.avgBongkar)}</b> &nbsp;•&nbsp;
+      Rata-rata Lama Bongkar: <b style="color:var(--text);">${secToHms(avgDur.avgBongkar)}</b> &nbsp;•&nbsp;
       Rata-rata Lama Antri: <b style="color:var(--text);">${secToHms(avgDur.avgAntri)}</b> &nbsp;•&nbsp;
-      Rata-rata Lama Proses: <b style="color:var(--text);">${secToHms(avgDur.avgProses)}</b>
+      Rata-rata Lama Proses (Scan In - Scan Out): <b style="color:var(--text);">${secToHms(avgDur.avgProses)}</b>
       &nbsp;(dari ${fmtInt(avgDur.docCount)} dokumen unik)
     </div>
     <table class="ar-table"><thead><tr>
@@ -13088,6 +13193,9 @@ function renderInboundDependent() {
   renderInboundKpiRow();
   renderInboundJumlahKartonChart();
   renderInboundProsesChart();
+  renderInboundMaterialTop10Chart("tertinggi");
+  renderInboundMaterialTop10Chart("terendah");
+  renderInboundMaterialDetailTable();
   renderInboundDetailTable();
 }
 
@@ -15866,6 +15974,8 @@ function resetAllData() {
   setUploadStatus("pnl", "Belum ada data", false);
   DB.inbound = []; inboundFilter.start = ""; inboundFilter.end = ""; inboundFilter.divisi = "ALL"; inboundFilter.divGroup = "4";
   inboundShowDetail.value = false;
+  inboundMaterialSearch.query = "";
+  const inboundMaterialSearchInputReset = document.getElementById("inboundMaterialSearchInput"); if (inboundMaterialSearchInputReset) inboundMaterialSearchInputReset.value = "";
   const inboundDivGroupReset = document.getElementById("inboundDivGroupSelect"); if (inboundDivGroupReset) inboundDivGroupReset.value = "4";
   buildInboundDivFilterUI();
   const inboundStartReset = document.getElementById("inboundFltStart"); if (inboundStartReset) inboundStartReset.value = "";
@@ -16051,6 +16161,9 @@ CHART_REGISTRY.push(
   { id: "ccyMapWrap", title: "Area Coverage", section: "Command Center" },
   { id: "inboundJumlahKarton", title: "Jumlah Inbound & Jumlah Karton", section: "Inbound" },
   { id: "inboundProses", title: "Analisis Proses Inbound", section: "Inbound" },
+  { id: "inboundMaterialTop10High", title: "Top 10 Pcode Terbanyak Masuk", section: "Inbound" },
+  { id: "inboundMaterialTop10Low", title: "Top 10 Pcode Tersedikit Masuk", section: "Inbound" },
+  { id: "inboundMaterialDetailWrap", title: "Detail per Pcode/Material", section: "Inbound" },
   { id: "inboundDetailWrap", title: "Detail Transaksi", section: "Inbound" },
   { id: "arMeetingTableWrap", title: "Filter Meeting AR (Overdue >= 7 hari)", section: "AR" },
   { id: "eroReasonBreakdown", title: "Breakdown Alasan (Reason Code)", section: "EDI RO" },
@@ -16227,6 +16340,9 @@ Object.assign(RENDER_FN, {
   ccyKecTable: renderCcyTopKecamatan,
   ccyMapWrap: renderCcyMap,
   inboundJumlahKarton: renderInboundJumlahKartonChart,
+  inboundMaterialTop10High: () => renderInboundMaterialTop10Chart("tertinggi"),
+  inboundMaterialTop10Low: () => renderInboundMaterialTop10Chart("terendah"),
+  inboundMaterialDetailWrap: renderInboundMaterialDetailTable,
   inboundDetailWrap: renderInboundDetailTable,
   arMeetingTableWrap: renderArMeetingTable,
   eroReasonBreakdown: renderEroReasonBreakdownChart,
@@ -17988,6 +18104,15 @@ function init() {
       const val = e.target.value;
       clearTimeout(debounce);
       debounce = setTimeout(() => { stockDetailSearch.query = val; renderStockDetail(); }, 250);
+    });
+  }
+  const inboundMaterialSearchInput = document.getElementById("inboundMaterialSearchInput");
+  if (inboundMaterialSearchInput) {
+    let debounceInboundMaterial = null;
+    inboundMaterialSearchInput.addEventListener("input", (e) => {
+      const val = e.target.value;
+      clearTimeout(debounceInboundMaterial);
+      debounceInboundMaterial = setTimeout(() => { inboundMaterialSearch.query = val; renderInboundMaterialDetailTable(); }, 250);
     });
   }
   const stockWhSimpleSearchInput = document.getElementById("stockWhSimpleSearchInput");

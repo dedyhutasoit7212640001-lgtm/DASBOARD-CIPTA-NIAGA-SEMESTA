@@ -3,23 +3,23 @@
 // diupload ulang ke GitHub, NAIKKAN angka versi di bawah ini (v9 -> v10,
 // dst). Tanpa menaikkan versi, browser lama bisa tetap memakai cache
 // lama dan tidak melihat update terbaru.
-const CACHE_NAME = "dashboard-b259-v15";
+const CACHE_NAME = "dashboard-b259-v16";
 const CORE_ASSETS = [
   "./index.html",
   "./manifest.json",
-  "./icon-72-v2.png",
-  "./icon-96-v2.png",
-  "./icon-128-v2.png",
-  "./icon-144-v2.png",
-  "./icon-152-v2.png",
-  "./icon-180-v2.png",
-  "./icon-192-v2.png",
-  "./icon-192-maskable-v2.png",
-  "./icon-384-v2.png",
-  "./icon-512-v2.png",
-  "./icon-512-maskable-v2.png",
-  "./favicon-32-v2.png",
-  "./favicon-16-v2.png"
+  "./icon-72-v3.png",
+  "./icon-96-v3.png",
+  "./icon-128-v3.png",
+  "./icon-144-v3.png",
+  "./icon-152-v3.png",
+  "./icon-180-v3.png",
+  "./icon-192-v3.png",
+  "./icon-192-maskable-v3.png",
+  "./icon-384-v3.png",
+  "./icon-512-v3.png",
+  "./icon-512-maskable-v3.png",
+  "./favicon-32-v3.png",
+  "./favicon-16-v3.png"
 ];
 
 self.addEventListener("install", (event) => {

@@ -5179,28 +5179,47 @@ const DB = { epe: [], qty: [], outlet: [], lbp: [], bs: [], ar: [], stockOpname:
    pengguna menekan "Reset Data" (perlu sandi) atau membersihkan storage
    browser secara manual.
 
-   Desain:
-   - Setiap kali setUploadStatus(target, text, true) dipanggil (yaitu SETIAP
-     upload berhasil di seluruh handler) maupun setUploadStatus(..., false)
-     (dipanggil di resetAllData()), sebuah simpan-debounced ke IndexedDB
-     dijadwalkan. Ini satu titik pusat yang otomatis mencakup semua modul
-     tanpa perlu mengedit tiap handler upload satu per satu.
-   - Isi yang disimpan: seluruh objek DB (via structured clone asli
-     IndexedDB, tanpa perlu JSON.stringify) + uploadStatusMeta (teks status
-     terakhir tiap kotak upload, supaya setelah restore kotaknya menampilkan
-     kembali nama file & ringkasan yang sama seperti sebelum ditutup).
-   - Saat halaman dibuka kembali, restoreFromIndexedDB() membaca snapshot
-     tsb, menuangkannya ke DB, membangun ulang seluruh dropdown/filter yang
-     bergantung pada data, lalu render ulang seluruh dashboard.
+   Desain (v2 -- per-dataset, supaya CEPAT & TIDAK PATAH-PATAH):
+   - Setiap dataset (epe, lbp, stockGudang, dst.) disimpan sbg RECORD
+     TERPISAH di IndexedDB ("db:epe", "db:lbp", dst.), BUKAN satu blob
+     gabungan. Versi pertama fitur ini menulis ulang SELURUH DB setiap kali
+     ada 1 dataset kecil yg berubah -- termasuk ikut menyalin ulang dataset
+     lain yg besar (mis. LBP ratusan ribu baris) walau isinya tidak berubah.
+     Itulah yg membuat prosesnya terasa lambat/patah-patah. Sekarang hanya
+     dataset yg BENAR-BENAR berubah (_dirtyDbKeys) yang ditulis ulang.
+   - setUploadStatus(target, text, ok) memetakan target -> key DB via
+     UPLOAD_TARGET_TO_DBKEY, menandainya "kotor", lalu menjadwalkan simpan
+     (debounce 500ms + requestIdleCallback) -- satu titik pusat yg otomatis
+     mencakup semua modul tanpa perlu mengedit tiap handler upload manual.
+   - Saat halaman dibuka kembali, restoreFromIndexedDB() membaca semua
+     record per-dataset dlm SATU transaksi, menuangkannya ke DB, membangun
+     ulang dropdown/filter yang bergantung pada data, lalu render ulang.
+   - Kompatibel dgn data yg sempat tersimpan di FORMAT LAMA (key "snapshot"
+     gabungan, dari rilis fitur ini yg pertama) -- otomatis dimigrasikan
+     sekali lalu dihapus.
    ========================================================================= */
 const IDB_NAME = "b259cns_dashboard";
 const IDB_VERSION = 1;
 const IDB_STORE = "kv";
-const IDB_SNAPSHOT_KEY = "snapshot";
+const IDB_META_KEY = "meta";
+const IDB_LEGACY_SNAPSHOT_KEY = "snapshot"; // format gabungan versi awal -- utk migrasi otomatis
+const DB_KEY_PREFIX = "db:";
+/* target atribut data-target kotak upload -> key sesungguhnya di objek DB.
+   Dipakai supaya kita tahu PERSIS dataset mana yg baru berubah, sehingga
+   HANYA itu yg perlu ditulis ulang ke IndexedDB. */
+const UPLOAD_TARGET_TO_DBKEY = {
+  epe: "epe", outlet: "outlet", qty: "qty", lbp: "lbp", bs: "bs", ar: "ar",
+  stockopname: "stockOpname", wablast: "waBlast", cutcost: "cutCost",
+  utilgudang: "utilGudang", openitem: "openItem", ediro: "ediRo", mpp: "mpp",
+  pnl: "pnl", inbound: "inbound", prestasi: "prestasi", sending: "sending",
+  agingstock: "agingStock", mydex: "mydex", stockgudang: "stockGudang", edistock: "ediStock"
+};
 const uploadStatusMeta = {}; // target -> HTML status terakhir (utk restore tampilan kotak upload)
 let _idbConnPromise = null;
 let _persistTimer = null;
 let _restoringData = false; // true selagi proses restore berjalan (supaya tidak menulis ulang apa yg baru dibaca)
+let _resettingData = false; // true selagi resetAllData() berjalan (supaya tidak ada persist "menyelip" sebelum clear() di akhir)
+const _dirtyDbKeys = new Set(); // key DB yg berubah sejak penyimpanan terakhir
 
 function idbSupported() { return typeof indexedDB !== "undefined" && indexedDB !== null; }
 function idbOpen() {
@@ -5220,54 +5239,59 @@ function idbOpen() {
   });
   return _idbConnPromise;
 }
-function idbPut(key, value) {
+function idbClearStore() {
   return idbOpen().then(db => new Promise((resolve, reject) => {
     try {
       const tx = db.transaction(IDB_STORE, "readwrite");
-      tx.objectStore(IDB_STORE).put(value, key);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error || new Error("Transaksi IndexedDB dibatalkan"));
-    } catch (err) { reject(err); }
-  }));
-}
-function idbGet(key) {
-  return idbOpen().then(db => new Promise((resolve, reject) => {
-    try {
-      const tx = db.transaction(IDB_STORE, "readonly");
-      const req = tx.objectStore(IDB_STORE).get(key);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    } catch (err) { reject(err); }
-  }));
-}
-function idbDelete(key) {
-  return idbOpen().then(db => new Promise((resolve, reject) => {
-    try {
-      const tx = db.transaction(IDB_STORE, "readwrite");
-      tx.objectStore(IDB_STORE).delete(key);
+      tx.objectStore(IDB_STORE).clear();
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     } catch (err) { reject(err); }
   }));
 }
-/* Simpan snapshot DB + meta status upload, di-debounce (500ms sejak
-   perubahan terakhir) dan dijalankan saat browser idle supaya tidak
-   mengganggu kelancaran UI walau datanya besar. */
+/* Tulis HANYA dataset yang sedang "kotor" (_dirtyDbKeys) dalam SATU
+   transaksi IndexedDB, dijalankan saat browser idle supaya tidak
+   mengganggu kelancaran scroll/animasi walau salah satu dataset lain
+   berukuran besar. */
 function persistDBNow() {
   if (!idbSupported()) return;
-  const snapshot = { db: DB, meta: uploadStatusMeta, savedAt: Date.now() };
+  const keysToSave = Array.from(_dirtyDbKeys);
+  _dirtyDbKeys.clear();
+  if (!keysToSave.length) return;
+  const pieces = {};
+  keysToSave.forEach(k => { pieces[k] = DB[k]; });
+  const metaSnapshot = { meta: uploadStatusMeta, savedAt: Date.now() };
   const run = () => {
-    idbPut(IDB_SNAPSHOT_KEY, snapshot).catch(err => {
+    idbOpen().then(db => new Promise((resolve, reject) => {
+      try {
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        const store = tx.objectStore(IDB_STORE);
+        keysToSave.forEach(k => store.put(pieces[k], DB_KEY_PREFIX + k));
+        store.put(metaSnapshot, IDB_META_KEY);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error("Transaksi IndexedDB dibatalkan"));
+      } catch (err) { reject(err); }
+    })).catch(err => {
       console.error("Gagal menyimpan data ke penyimpanan lokal (IndexedDB):", err);
+      showToast("Gagal menyimpan data ke penyimpanan lokal browser (" + (err && err.message ? err.message : "error tidak dikenal") + "). Data mungkin tidak tersimpan setelah aplikasi ditutup.", "error");
     });
   };
   if (typeof requestIdleCallback === "function") requestIdleCallback(run, { timeout: 2000 });
   else setTimeout(run, 0);
 }
-function schedulePersist() {
+/* target: nilai atribut data-target kotak upload (mis. "lbp",
+   "stockgudang"). Dipetakan ke key DB yg sesuai lalu ditandai kotor --
+   HANYA dataset itu yang akan ditulis ulang, dataset lain yg tidak
+   berubah tidak disentuh sama sekali. Kalau dipanggil tanpa target,
+   seluruh key ditandai kotor (jalur aman, dipakai saat reset). */
+function schedulePersist(target) {
   if (_restoringData) return; // jangan tulis ulang data yg baru saja dipulihkan
+  if (_resettingData) return; // jangan ada persist yg "menyelip" di tengah proses reset
   if (!idbSupported()) return;
+  const dbKey = target ? UPLOAD_TARGET_TO_DBKEY[target] : null;
+  if (dbKey) _dirtyDbKeys.add(dbKey);
+  else Object.keys(DB).forEach(k => _dirtyDbKeys.add(k));
   clearTimeout(_persistTimer);
   _persistTimer = setTimeout(persistDBNow, 500);
 }
@@ -5311,30 +5335,72 @@ function dbTotalRowCount(dbObj) {
   }, 0);
 }
 /* Dipanggil sekali saat halaman selesai dimuat (setelah init()). Membaca
-   snapshot dari IndexedDB (kalau ada), menuangkannya ke DB, lalu membangun
-   ulang seluruh UI supaya dashboard langsung tampil terisi seperti sebelum
-   tab ditutup -- tanpa perlu upload ulang. */
+   seluruh record per-dataset dari IndexedDB dalam SATU transaksi (lebih
+   cepat daripada satu-satu), menuangkannya ke DB, membangun ulang seluruh
+   UI supaya dashboard langsung tampil terisi seperti sebelum tab ditutup
+   -- tanpa perlu upload ulang. Juga memigrasikan otomatis data yg sempat
+   tersimpan di format gabungan lama (rilis pertama fitur ini) kalau ada. */
 function restoreFromIndexedDB() {
   if (!idbSupported()) return;
-  idbGet(IDB_SNAPSHOT_KEY).then(saved => {
-    if (!saved || !saved.db) return;
+  const dbKeys = Object.keys(DB);
+  idbOpen().then(db => new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction(IDB_STORE, "readonly");
+      const store = tx.objectStore(IDB_STORE);
+      const savedDb = {};
+      let savedMeta = null, legacy = null;
+      let pending = dbKeys.length + 2;
+      const done = () => { if (--pending === 0) resolve({ savedDb, savedMeta, legacy }); };
+      dbKeys.forEach(k => {
+        const req = store.get(DB_KEY_PREFIX + k);
+        req.onsuccess = () => { if (req.result !== undefined) savedDb[k] = req.result; done(); };
+        req.onerror = () => done();
+      });
+      const metaReq = store.get(IDB_META_KEY);
+      metaReq.onsuccess = () => { savedMeta = metaReq.result; done(); };
+      metaReq.onerror = () => done();
+      const legacyReq = store.get(IDB_LEGACY_SNAPSHOT_KEY);
+      legacyReq.onsuccess = () => { legacy = legacyReq.result; done(); };
+      legacyReq.onerror = () => done();
+    } catch (err) { reject(err); }
+  })).then(({ savedDb, savedMeta, legacy }) => {
+    // Migrasi otomatis dari format gabungan lama, kalau format baru masih kosong.
+    let finalDb = savedDb, finalMeta = savedMeta && savedMeta.meta;
+    if ((!finalDb || !Object.keys(finalDb).length) && legacy && legacy.db) {
+      finalDb = legacy.db;
+      finalMeta = legacy.meta;
+    }
+    if (!finalDb || !Object.keys(finalDb).length) return;
     _restoringData = true;
     try {
-      Object.keys(saved.db).forEach(k => { if (k in DB) DB[k] = saved.db[k]; });
-      if (saved.meta) Object.assign(uploadStatusMeta, saved.meta);
+      Object.keys(finalDb).forEach(k => { if (k in DB) DB[k] = finalDb[k]; });
+      if (finalMeta) Object.assign(uploadStatusMeta, finalMeta);
       restoreUploadStatusUI();
       rebuildAllFilterUI();
       safeCall(updateDateBounds);
       renderAll();
-      if (dbTotalRowCount(saved.db) > 0) {
+      if (dbTotalRowCount(finalDb) > 0) {
         showToast("Data yang sebelumnya diupload berhasil dimuat kembali.", "success");
       }
+      if (legacy) idbOpen().then(db => { try { db.transaction(IDB_STORE, "readwrite").objectStore(IDB_STORE).delete(IDB_LEGACY_SNAPSHOT_KEY); } catch (e) {} });
     } catch (err) {
       console.error("Gagal memulihkan data dari penyimpanan lokal:", err);
     } finally {
       _restoringData = false;
     }
   }).catch(err => console.error("Gagal membaca penyimpanan lokal (IndexedDB):", err));
+}
+/* Minta browser menjadikan storage situs ini "persistent" (tidak mudah
+   dibersihkan otomatis saat browser kehabisan tempat) -- terutama penting
+   utk PWA yg diinstall. Gagal/ditolak tidak fatal, hanya dicatat. */
+function requestPersistentStorage() {
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persist().then(granted => {
+        console.log(granted ? "Penyimpanan lokal dijadikan persistent." : "Browser belum menjadikan penyimpanan persistent (tetap jalan normal, hanya lebih rawan dibersihkan browser saat kehabisan tempat).");
+      }).catch(() => {});
+    }
+  } catch (err) { /* abaikan -- fitur opsional */ }
 }
 
 const mydexFilter = { start: "", end: "" };
@@ -14833,7 +14899,9 @@ function setUploadStatus(target, text, ok) {
   // Titik pusat: SETIAP upload berhasil maupun reset data akan lewat sini,
   // sehingga cukup satu tempat ini utk menjadwalkan penyimpanan ke
   // IndexedDB (lihat definisi schedulePersist() di dekat deklarasi DB).
-  schedulePersist();
+  // "target" diteruskan supaya HANYA dataset yg baru berubah yg ditulis
+  // ulang -- dataset lain yg besar & tidak berubah tidak ikut disalin.
+  schedulePersist(target);
 }
 function summarizeRange(rows) {
   if (!rows.length) return "-";
@@ -15708,11 +15776,15 @@ function resetAllData() {
   const pw = prompt("Masukkan sandi untuk mereset seluruh data:");
   if (pw === null) return;
   if (pw !== RESET_PASSWORD) { showToast("Sandi salah. Reset dibatalkan.", "error"); return; }
-  // Hapus juga snapshot yang tersimpan di IndexedDB -- jangan tunggu debounce
-  // schedulePersist() di bawah (yg baru jalan ~500ms lagi), supaya kalau tab
-  // langsung ditutup setelah reset, data lama TIDAK ikut tersimpan kembali.
+  // Selama proses reset berjalan, tahan SEMUA penjadwalan simpan ke
+  // IndexedDB (banyak setUploadStatus(..., false) akan terpanggil di bawah,
+  // masing2 normalnya menjadwalkan persist) -- baru clear() penyimpanan
+  // lokal di paling akhir fungsi ini, SEKALI, setelah semua state benar2
+  // sudah kosong. Kalau tidak, clear() di awal akan "ditimpa ulang" oleh
+  // persist yg terjadwal dari setUploadStatus2 setelahnya.
+  _resettingData = true;
   Object.keys(uploadStatusMeta).forEach(k => delete uploadStatusMeta[k]);
-  idbDelete(IDB_SNAPSHOT_KEY).catch(err => console.error("Gagal menghapus penyimpanan lokal:", err));
+  _dirtyDbKeys.clear();
   DB.epe = []; DB.qty = []; DB.outlet = []; DB.lbp = []; DB.bs = [];
   filter.start = ""; filter.end = ""; filter.reasons = new Set(REASON_ORDER);
   lbpFilter.divisions = new Set(DIVISIONS);
@@ -15881,6 +15953,15 @@ function resetAllData() {
   if (soShowTableReset) soShowTableReset.checked = false;
   document.querySelectorAll('input[data-target]').forEach(i => i.value = "");
   renderAll();
+  // Semua state sudah kosong -- baru sekarang bersihkan penyimpanan lokal
+  // (SEKALI, di paling akhir) supaya tidak ada lagi persist terjadwal yg
+  // menulis balik data lama. clear() menghapus SEMUA record IndexedDB
+  // (per-dataset + format lama sekalipun).
+  _dirtyDbKeys.clear();
+  clearTimeout(_persistTimer);
+  idbClearStore()
+    .catch(err => console.error("Gagal menghapus penyimpanan lokal:", err))
+    .finally(() => { _resettingData = false; });
   showToast("Semua data berhasil direset.", "success");
 }
 
@@ -18496,6 +18577,10 @@ function init() {
   // dibangun, supaya halaman tetap terasa cepat terbuka, lalu terisi begitu
   // datanya siap dibaca dari penyimpanan lokal.
   restoreFromIndexedDB();
+  // Minta browser menjadikan storage situs ini persistent (penting utk PWA
+  // yg diinstall) supaya tidak mudah dibersihkan otomatis saat perangkat
+  // kehabisan tempat.
+  requestPersistentStorage();
 }
 
 document.addEventListener("DOMContentLoaded", init);

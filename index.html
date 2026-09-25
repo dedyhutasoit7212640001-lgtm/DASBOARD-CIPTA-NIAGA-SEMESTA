@@ -5493,12 +5493,40 @@ const chartModes = {
 // rasa "berat" saat pindah ribbon. Diisi malas (lazy) saat showPage()
 // PERTAMA kali dipanggil.
 let _pageEls = null, _navEls = null;
+// PENTING (perbaikan performa navigasi -- penyebab UTAMA "patah-patah"
+// saat pindah ribbon): sebelumnya halaman non-aktif disembunyikan pakai
+// display:none, yang membuang SELURUH hasil layout browser utk halaman
+// itu. Begitu halaman dibuka lagi, browser terpaksa menghitung ulang
+// layout SELURUH isinya dari nol (tabel ribuan baris, puluhan chart-card)
+// secara SINKRON pada saat itu juga -- diukur sampai ~150-200ms utk
+// ribbon dgn tabel besar (mis. Stock, MyDex, EDI RO), itulah yg terasa
+// sbg jeda/patahan. Kita ganti mekanisme sembunyi ke CSS
+// `content-visibility:hidden`, yg TETAP menyimpan hasil layout halaman
+// di cache browser walau disembunyikan -- jadi saat dibuka lagi browser
+// tinggal memakai cache-nya (~2-10ms, diverifikasi lewat pengukuran
+// performance.now() langsung), bukan menghitung ulang semua. Cek
+// dukungan browser dulu (CSS.supports) & fallback ke display:none pada
+// browser lama yg belum kenal content-visibility, supaya tetap aman.
+const SUPPORTS_CONTENT_VISIBILITY =
+  typeof CSS !== "undefined" && !!CSS.supports && CSS.supports("content-visibility", "hidden");
 function showPage(page) {
   if (!_pageEls) _pageEls = Array.from(document.querySelectorAll("[data-page]"));
   if (!_navEls) _navEls = Array.from(document.querySelectorAll("[data-nav]"));
+  // Dikumpulkan sekalian di loop yg sama: elemen halaman yg AKTIF terlihat
+  // saat ini -- dipakai di bawah (resize chart) sbg pengganti offsetParent,
+  // krn offsetParent TERNYATA tidak lagi bisa diandalkan setelah memakai
+  // content-visibility (lihat catatan di bawah).
+  const shownPageEls = [];
   _pageEls.forEach(el => {
     const pages = el.getAttribute("data-page").split(" ");
-    el.style.display = pages.includes(page) ? "" : "none";
+    const show = pages.includes(page);
+    if (show) shownPageEls.push(el);
+    if (SUPPORTS_CONTENT_VISIBILITY) {
+      el.style.display = "";
+      el.style.contentVisibility = show ? "visible" : "hidden";
+    } else {
+      el.style.display = show ? "" : "none";
+    }
   });
   // Toggle "active" pada SEMUA link nav (nav atas lama + sidebar baru) --
   // keduanya memakai atribut data-nav yang sama, jadi satu mekanisme ini
@@ -5532,12 +5560,24 @@ function showPage(page) {
   // resize() Chart.js selalu memicu re-layout+redraw penuh (mahal),
   // dikali puluhan chart, PADAHAL chart yg tersembunyi toh tidak
   // terlihat & akan otomatis di-resize benar nanti saat halamannya
-  // sendiri dibuka. Sekarang HANYA chart yg canvas-nya benar2 visible
-  // (offsetParent tidak null -- cara cepat cek visibility DOM tanpa
-  // getComputedStyle yg lebih mahal) yg di-resize.
+  // sendiri dibuka. Sekarang HANYA chart yg canvas-nya benar2 ada di
+  // dalam halaman yg SEDANG ditampilkan yg di-resize.
+  // CATATAN (bug yg sempat kejadian & diperbaiki di sini): dulu cara
+  // ceknya pakai `canvas.offsetParent !== null`, yg valid SELAMA
+  // halaman disembunyikan pakai display:none. Tapi setelah beralih ke
+  // content-visibility:hidden (lihat catatan besar di atas showPage),
+  // offsetParent BISA tetap bernilai non-null utk chart di halaman yg
+  // sedang disembunyikan (browser mempertahankan referensi box lama dari
+  // cache layout-nya) -- kalau tetap dipakai, semua chart di semua
+  // halaman akan ikut di-resize setiap pindah ribbon (persis masalah yg
+  // tadinya mau dihindari optimisasi ini). Maka dipakai cara yg PASTI
+  // benar: cek langsung apakah canvas ada di dalam salah satu elemen
+  // halaman yg baru saja ditandai "show" di atas.
   requestAnimationFrame(() => {
     Object.values(CHARTS).forEach(c => {
-      try { if (c.canvas && c.canvas.offsetParent !== null) c.resize(); } catch (e) {}
+      try {
+        if (c.canvas && shownPageEls.some(el => el.contains(c.canvas))) c.resize();
+      } catch (e) {}
     });
   });
 }

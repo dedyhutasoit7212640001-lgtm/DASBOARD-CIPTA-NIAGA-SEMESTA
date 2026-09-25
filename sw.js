@@ -3,7 +3,7 @@
 // diupload ulang ke GitHub, NAIKKAN angka versi di bawah ini (v9 -> v10,
 // dst). Tanpa menaikkan versi, browser lama bisa tetap memakai cache
 // lama dan tidak melihat update terbaru.
-const CACHE_NAME = "dashboard-b259-v10";
+const CACHE_NAME = "dashboard-b259-v11";
 const CORE_ASSETS = [
   "./index.html",
   "./manifest.json",
@@ -12,9 +12,12 @@ const CORE_ASSETS = [
   "./icon-128.png",
   "./icon-144.png",
   "./icon-152.png",
+  "./icon-180.png",
   "./icon-192.png",
+  "./icon-192-maskable.png",
   "./icon-384.png",
   "./icon-512.png",
+  "./icon-512-maskable.png",
   "./favicon-32.png",
   "./favicon-16.png"
 ];

@@ -5493,6 +5493,29 @@ const chartModes = {
 // rasa "berat" saat pindah ribbon. Diisi malas (lazy) saat showPage()
 // PERTAMA kali dipanggil.
 let _pageEls = null, _navEls = null;
+// State ribbon aktif + antrian render bertahap (renderAll()) -- dideklarasi
+// di sini (bukan di dekat renderAll()) supaya showPage() aman memakainya
+// kapan pun dipanggil, tanpa bergantung urutan eksekusi top-level script.
+let _currentPage = "home";
+let _renderQueue = null;
+let _renderAllToken = 0;
+// Hook kecil utk diagnostik/pengujian (mis. Playwright) -- cek sisa
+// pekerjaan render bertahap tanpa mengekspos variabel internal `let`
+// (yg tidak otomatis nempel ke window pada script biasa).
+window.__renderQueueLength = () => (_renderQueue ? _renderQueue.length : 0);
+// Partisi stabil: entri milik `page` (atau tanpa page/global) dipindah ke
+// DEPAN antrian, sisanya tetap berurutan spt semula. Cuma mengubah URUTAN
+// eksekusi, bukan ISI -- jadi aman dipanggil kapan saja, termasuk saat
+// antrian sedang berjalan (dipakai showPage() saat user pindah ribbon di
+// tengah render).
+function reorderRenderQueue(queue, page) {
+  const front = [], back = [];
+  for (const item of queue) {
+    (item.page === page || item.page === null ? front : back).push(item);
+  }
+  queue.length = 0;
+  queue.push(...front, ...back);
+}
 // PENTING (perbaikan performa navigasi -- penyebab UTAMA "patah-patah"
 // saat pindah ribbon): sebelumnya halaman non-aktif disembunyikan pakai
 // display:none, yang membuang SELURUH hasil layout browser utk halaman
@@ -5512,6 +5535,14 @@ const SUPPORTS_CONTENT_VISIBILITY =
 function showPage(page) {
   if (!_pageEls) _pageEls = Array.from(document.querySelectorAll("[data-page]"));
   if (!_navEls) _navEls = Array.from(document.querySelectorAll("[data-nav]"));
+  // Catat ribbon yg sedang aktif (dipakai renderAll()/reorderRenderQueue()
+  // di bawah supaya render ribbon yg sedang dilihat user selalu
+  // diprioritaskan). Kalau ada render bertahap yg masih berjalan (mis. baru
+  // saja upload file lalu user langsung pindah ribbon), susun ulang
+  // sisa antriannya sekarang juga supaya ribbon baru ini didahulukan --
+  // TIDAK ada fungsi yg dilewati, cuma urutannya yg berubah.
+  _currentPage = page;
+  if (_renderQueue && _renderQueue.length) reorderRenderQueue(_renderQueue, page);
   // Dikumpulkan sekalian di loop yg sama: elemen halaman yg AKTIF terlihat
   // saat ini -- dipakai di bawah (resize chart) sbg pengganti offsetParent,
   // krn offsetParent TERNYATA tidak lagi bisa diandalkan setelah memakai
@@ -14996,43 +15027,83 @@ function renderCommandCenter() {
 }
 
 
+// PENTING (perbaikan performa #2 -- penyebab "patah-patah" saat UPLOAD,
+// GANTI FILTER, & REFRESH, berbeda dari perbaikan showPage() di atas):
+// renderAll() memanggil ~30-an fungsi render yang mencakup SEMUA ribbon
+// sekaligus (bukan cuma yang sedang dilihat), termasuk ribbon yang
+// tersembunyi (content-visibility:hidden). Diukur: dgn 18 dataset penuh,
+// SATU panggilan renderAll() menghabiskan ~700ms JS SINKRON tanpa jeda --
+// selama itu browser TIDAK BISA mengecat ulang layar atau merespon klik
+// apa pun (itulah yg terasa sbg "macet sesaat"/patahan), dan ini terjadi
+// SETIAP kali user upload 1 file (dipanggil ulang bertambah berat seiring
+// makin banyak data terisi).
+//
+// Fix: pecah daftar fungsi render jadi potongan kecil yg dijalankan
+// bertahap lewat requestAnimationFrame, dgn jatah waktu (~10ms) per
+// frame -- browser jadi sempat mengecat & merespon di sela-sela setiap
+// potongan, sehingga terasa mulus walau total pekerjaannya sama persis
+// (TIDAK ADA fungsi yg dilewati/skip -- cuma urutan/waktu eksekusinya yg
+// diatur, jadi tidak ada risiko data jadi tidak lengkap/basi).
+// Bonus: fungsi render utk ribbon yg SEDANG DILIHAT user diprioritaskan
+// paling depan antrian (lihat _currentPage & reorderRenderQueue()) supaya
+// perubahan pada layar yg sedang aktif terasa nyaris instan, sementara
+// ribbon lain tetap ikut ter-render di belakang layar tanpa bikin macet.
+const RENDER_ALL_ENTRIES = [
+  { page: "home", fn: renderKpi },
+  { page: null, fn: renderHeaderInfo },     // header brand -- selalu tampil di semua ribbon
+  { page: null, fn: renderStatusBar },      // status bar bawah -- selalu tampil di semua ribbon
+  { page: "home", fn: renderRitaseHero },
+  { page: "omset", fn: renderEpeHero },
+  { page: "omset", fn: renderUtilisasiChart },
+  { page: "omset", fn: renderUtilisasiDetailTable },
+  { page: "omset", fn: renderLbpKecamatan },
+  { page: "omset", fn: renderLbpKabupaten },
+  { page: "omset", fn: renderLbpSalesman },
+  { page: "omset", fn: renderLbpDivTrend },
+  { page: "home", fn: renderLbpDivTrendHome },
+  { page: "warehouse", fn: renderWarehouseMode },
+  { page: "ar", fn: renderArDependent },
+  { page: "wablast", fn: renderWaBlastDependent },
+  { page: "cutcost", fn: renderCutCostDependent },
+  { page: "openitem", fn: renderOpenItemDependent },
+  { page: "ediro", fn: renderEdiRoDependent },
+  { page: "qty", fn: () => renderOfrDelivery1("qty", fQty()) },
+  { page: "qty", fn: () => renderOfrDelivery2("qty", fQty()) },
+  { page: "qty", fn: () => renderOfrGagal("qty", fQty()) },
+  { page: "qty", fn: () => renderOfrReasons("qty", fQty()) },
+  { page: "outlet", fn: () => renderOfrDelivery1("outlet", fOutlet()) },
+  { page: "outlet", fn: () => renderOfrDelivery2("outlet", fOutlet()) },
+  { page: "outlet", fn: () => renderOfrGagal("outlet", fOutlet()) },
+  { page: "outlet", fn: () => renderOfrReasons("outlet", fOutlet()) },
+  { page: "home", fn: renderCommandCenter },
+  { page: "mpp", fn: renderMppDependent },
+  { page: "pnl", fn: renderPnlDependent },
+  { page: "inbound", fn: renderInboundDependent },
+  { page: "prestasi", fn: renderPrestasiDependent },
+  { page: "sending", fn: renderSendingDependent },
+  { page: "agingstock", fn: renderAgingStockDependent },
+  { page: "stock", fn: renderStockDependent },
+  { page: "mydex", fn: renderMydexDependent },
+  { page: null, fn: renderAllGenericDetails } // lintas-ribbon, biarkan di akhir
+];
+// (_currentPage, _renderQueue, _renderAllToken, reorderRenderQueue sudah
+// dideklarasi di dekat showPage()/_pageEls di atas.)
 function renderAll() {
-  renderKpi();
-  renderHeaderInfo();
-  renderStatusBar();
-  renderRitaseHero();
-  renderEpeHero();
-  renderUtilisasiChart();
-  renderUtilisasiDetailTable();
-  renderLbpKecamatan();
-  renderLbpKabupaten();
-  renderLbpSalesman();
-  renderLbpDivTrend();
-  renderLbpDivTrendHome();
-  renderWarehouseMode();
-  renderArDependent();
-  renderWaBlastDependent();
-  renderCutCostDependent();
-  renderOpenItemDependent();
-  renderEdiRoDependent();
-  renderOfrDelivery1("qty", fQty());
-  renderOfrDelivery2("qty", fQty());
-  renderOfrGagal("qty", fQty());
-  renderOfrReasons("qty", fQty());
-  renderOfrDelivery1("outlet", fOutlet());
-  renderOfrDelivery2("outlet", fOutlet());
-  renderOfrGagal("outlet", fOutlet());
-  renderOfrReasons("outlet", fOutlet());
-  renderCommandCenter();
-  renderMppDependent();
-  renderPnlDependent();
-  renderInboundDependent();
-  renderPrestasiDependent();
-  renderSendingDependent();
-  renderAgingStockDependent();
-  renderStockDependent();
-  renderMydexDependent();
-  renderAllGenericDetails();
+  const myToken = ++_renderAllToken;
+  const queue = RENDER_ALL_ENTRIES.slice();
+  reorderRenderQueue(queue, _currentPage);
+  _renderQueue = queue;
+  const BUDGET_MS = 10;
+  function step() {
+    if (myToken !== _renderAllToken) return; // dibatalkan oleh renderAll() lebih baru
+    const t0 = performance.now();
+    while (_renderQueue.length && (performance.now() - t0) < BUDGET_MS) {
+      const item = _renderQueue.shift();
+      try { item.fn(); } catch (e) { console.error("renderAll() gagal pada satu bagian:", e); }
+    }
+    if (_renderQueue.length) requestAnimationFrame(step);
+  }
+  step();
 }
 
 /* =========================================================================

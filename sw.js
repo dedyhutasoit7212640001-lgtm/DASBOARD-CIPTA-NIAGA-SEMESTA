@@ -1,9 +1,9 @@
 // Service Worker -- Tools Monitoring Cipta Niaga Semesta
 // PENTING: setiap kali file index.html/manifest/icon diganti dan
-// diupload ulang ke GitHub, NAIKKAN angka versi di bawah ini (v3 -> v4,
+// diupload ulang ke GitHub, NAIKKAN angka versi di bawah ini (v7 -> v8,
 // dst). Tanpa menaikkan versi, browser lama bisa tetap memakai cache
 // lama dan tidak melihat update terbaru.
-const CACHE_NAME = "dashboard-b259-v7";
+const CACHE_NAME = "dashboard-b259-v8";
 const CORE_ASSETS = [
   "./index.html",
   "./manifest.json",

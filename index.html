@@ -3509,6 +3509,84 @@
     </div>
   </section>
 
+  <section class="block" id="sec-omset-detail" data-page="omset">
+
+    <div class="head"><h2><span class="head-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.5s7-6.2 7-11.1a7 7 0 1 0-14 0c0 4.9 7 11.1 7 11.1z"/><circle cx="12" cy="10.1" r="2.8"/></svg></span><span>Omset — Wilayah, Toko/Pcode &amp; Channel</span></h2><span>Rincian Omset per Kecamatan/Kabupaten, pencarian riwayat order per Toko/Pcode, dan kontribusi per Channel (dihitung dari Harga Bruto &amp; Isi Karton)</span></div>
+
+    <!-- ===== Widget A: Ringkasan Wilayah (Kecamatan & Kabupaten) ===== -->
+    <div class="card chart-card" data-chart-id="omsetWilayahWrap" data-chart-title="Omset - Ringkasan Wilayah">
+      <div id="chart-omsetWilayahWrap" style="display:none;"></div>
+      <div class="card-top">
+        <div class="titles"><h3>📍 Ringkasan Wilayah (Kecamatan &amp; Kabupaten/Kota)</h3><div class="desc">Pilih Kecamatan atau Kabupaten/Kota untuk melihat Total Isi Karton dan Total Omset (Harga Bruto) di wilayah tersebut</div></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <label style="font-size:11px; color:var(--sub); font-weight:700; text-transform:uppercase;">Filter Divisi</label>
+        <div style="display:flex; gap:8px;">
+          <span class="chip" id="omsetWilayahDivAll">Pilih Semua</span>
+          <span class="chip" id="omsetWilayahDivNone">Kosongkan</span>
+        </div>
+      </div>
+      <div class="presets" id="omsetWilayahDivisionList"></div>
+      <div class="filterbar" style="margin-top:12px;">
+        <div class="field" style="min-width:260px;"><label>Kecamatan</label><select class="mode-select" id="omsetWilayahKecamatanSelect"><option value="ALL">Pilih Kecamatan...</option></select></div>
+        <div class="field" style="min-width:260px;"><label>Kabupaten / Kota</label><select class="mode-select" id="omsetWilayahKabupatenSelect"><option value="ALL">Pilih Kabupaten/Kota...</option></select></div>
+      </div>
+      <div class="grid grid-kpi" id="omsetWilayahKecKpi" style="margin-top:10px;"></div>
+      <div class="grid grid-kpi" id="omsetWilayahKabKpi" style="margin-top:10px;"></div>
+    </div>
+
+    <!-- ===== Widget B: Cari Toko / Pcode ===== -->
+    <div class="card chart-card" data-chart-id="omsetSearchWrap" data-chart-title="Omset - Cari Toko/Pcode" style="margin-top:16px;">
+      <div id="chart-omsetSearchWrap" style="display:none;"></div>
+      <div class="card-top">
+        <div class="titles"><h3>🔍 Cari Toko / Pcode</h3><div class="desc">Cari nama Toko, atau kode/nama Pcode, untuk melihat riwayat order (Tanggal, Pcode, Harga Bruto, Isi Karton)</div></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <label style="font-size:11px; color:var(--sub); font-weight:700; text-transform:uppercase;">Filter Divisi</label>
+        <div style="display:flex; gap:8px;">
+          <span class="chip" id="omsetSearchDivAll">Pilih Semua</span>
+          <span class="chip" id="omsetSearchDivNone">Kosongkan</span>
+        </div>
+      </div>
+      <div class="presets" id="omsetSearchDivisionList"></div>
+      <div class="filterbar" style="margin-top:12px;">
+        <div class="field" style="min-width:320px;"><label>Nama Toko atau Pcode / Nama Pcode</label><input type="text" id="omsetSearchInput" placeholder="mis. nama toko, 351506, atau LE MINERALE"></div>
+      </div>
+      <div id="omsetSearchCount" style="font-size:12px; color:var(--sub); font-weight:700; margin:6px 0;"></div>
+      <div class="grid grid-kpi" id="omsetSearchKpiRow" style="margin-bottom:10px;"></div>
+      <div class="table-export-row"><button class="table-export-btn" data-export-table="omsetSearchWrap" data-export-name="Omset_CariTokoPcode">⬇️ Excel</button></div>
+      <div id="omsetSearchWrap" style="max-height:600px; overflow:auto; margin-top:8px;"></div>
+    </div>
+
+    <!-- ===== Widget C: Channel Penyumbang Omset (Terbesar & Terkecil) ===== -->
+    <div class="card chart-card" data-chart-id="omsetChannelWrap" data-chart-title="Omset - Channel Penyumbang" style="margin-top:16px;">
+      <div id="chart-omsetChannelWrap" style="display:none;"></div>
+      <div class="card-top">
+        <div class="titles"><h3>📊 Channel Penyumbang Omset (Terbesar &amp; Terkecil)</h3><div class="desc">Ranking Channel berdasarkan Total Omset (Harga Bruto) dan Isi Karton — klik salah satu Channel untuk melihat rincian order-nya</div></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <label style="font-size:11px; color:var(--sub); font-weight:700; text-transform:uppercase;">Filter Divisi</label>
+        <div style="display:flex; gap:8px;">
+          <span class="chip" id="omsetChannelDivAll">Pilih Semua</span>
+          <span class="chip" id="omsetChannelDivNone">Kosongkan</span>
+        </div>
+      </div>
+      <div class="presets" id="omsetChannelDivisionList"></div>
+      <div class="table-export-row" style="margin-top:12px;"><button class="table-export-btn" data-export-table="omsetChannelRankWrap" data-export-name="Omset_RankingChannel">⬇️ Excel</button></div>
+      <div id="omsetChannelRankWrap" style="margin-top:8px;"></div>
+      <div id="omsetChannelDetailBox" style="display:none; margin-top:16px; border-top:1px solid var(--line); padding-top:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div id="omsetChannelDetailTitle" style="font-weight:800; font-size:14px;"></div>
+          <span class="chip" id="omsetChannelDetailClose">✕ Tutup</span>
+        </div>
+        <div id="omsetChannelDetailCount" style="font-size:12px; color:var(--sub); font-weight:700; margin-bottom:6px;"></div>
+        <div class="table-export-row"><button class="table-export-btn" data-export-table="omsetChannelDetailWrap" data-export-name="Omset_DetailChannel">⬇️ Excel</button></div>
+        <div id="omsetChannelDetailWrap" style="max-height:600px; overflow:auto; margin-top:8px;"></div>
+      </div>
+    </div>
+
+  </section>
+
   <!-- ============ OFR QUANTITY ============ -->
   <section class="block" id="sec-qty" data-page="qty">
 
@@ -5339,6 +5417,7 @@ function rebuildAllFilterUI() {
     buildEroDivFilterUI, buildEroSalesmanFilterUI, buildPrestasiSalesmanFilterUI,
     buildSendingSalesmanFilterUI, buildAgingStockPcodeFilterUI, buildInboundDivFilterUI,
     buildOiFilterUI, buildUgBranchFilterUI, buildArSalesmanFilterUI, buildPnlFilterUI,
+    buildOmsetDetailFilterUI, buildOmsetWilayahDropdowns,
     buildExportList
   ].forEach(fn => { if (typeof fn === "function") safeCall(fn); });
 }
@@ -5450,6 +5529,13 @@ const inboundMaterialSearch = { query: "" };
 const DIVISIONS = ["BIS", "CWC", "MU", "M3"];
 const lbpFilter = { divisions: new Set(DIVISIONS) };
 const dimFilter = { sales: "ALL", kecamatan: "ALL", kabupaten: "ALL" };
+/* State utk 3 widget baru "Omset -- Wilayah, Toko/Pcode & Channel" (masing2
+   punya filter Divisi SENDIRI, independen dari lbpFilter/dimFilter global di
+   atas -- sesuai permintaan user "ada juga didalam kolom ini filter per
+   divisi" pada tiap widget). Semua tetap ikut filter tanggal GLOBAL (inRange). */
+const omsetWilayahFilter = { divisions: new Set(DIVISIONS) };
+const omsetSearchFilter = { divisions: new Set(DIVISIONS), query: "" };
+const omsetChannelFilter = { divisions: new Set(DIVISIONS), selected: null };
 const rankMode = { kecamatan: "top10", kabupaten: "top10" };
 const lbpDivTrend = { grouping: "all" };
 /* Instance mandiri untuk ribbon Home — default tampilan per Divisi (BIS/CWC/MU245/M3),
@@ -9341,8 +9427,28 @@ function findLbpColumns(headerArr) {
     iKecamatan: find("Kecamatan"),
     iKabupaten: find("Kabupaten", "Kabupaten/Kota", "Kota/Kabupaten"),
     iPeriode: find("Periode"),
-    iSalesman: find("Salesman", "Sales Man", "Nama Salesman")
+    iSalesman: find("Salesman", "Sales Man", "Nama Salesman"),
+    // Kolom BARU (fitur Ringkasan Wilayah, Cari Toko/Pcode, Channel) --
+    // SEMUA OPSIONAL (tidak ikut divalidasi wajib di atas) supaya file LBP
+    // versi lama yang belum punya kolom2 ini tetap bisa diupload spt biasa
+    // (fitur baru itu saja yang otomatis kosong/tidak tampil).
+    iNoOutlet: find("No Outlet", "NoOutlet", "Kode Outlet"),
+    iNamaOutlet: find("Nama Outlet", "NamaOutlet", "Outlet"),
+    iPcode: find("Pcode", "P.Code", "Kode Produk"),
+    iNamaProduk: find("Nama Produk", "NamaProduk", "Nama Barang"),
+    iKemasan: find("Kemasan"),
+    iQtyPcs: find("QTYPCS", "QTY PCS", "Qty Pcs"),
+    iChannel: find("Channel")
   };
+}
+/* Ukuran 1 karton (dlm satuan pcs/pack terkecil) dari teks kolom "Kemasan",
+   mis. "CAR/12  ,BOT/1  ,BOT" -> 12 (1 karton = 12 botol). Konvensi file
+   LBP: token PERTAMA selalu satuan karton ("CAR/<isi>"), sudah divalidasi
+   cocok 100% dgn kolom XQTYPCS pada puluhan ribu baris data sampel asli. */
+function parseLbpCartonSize(kemasanStr) {
+  if (!kemasanStr) return 0;
+  const m = String(kemasanStr).trim().match(/^[A-Za-z]+\/(\d+)/);
+  return m ? (parseInt(m[1], 10) || 0) : 0;
 }
 function buildLbpRow(getCell, C) {
   const date = parseLbpDateCell(getCell(C.iTgl));
@@ -9354,6 +9460,19 @@ function buildLbpRow(getCell, C) {
   const kec = C.iKecamatan >= 0 ? getCell(C.iKecamatan) : "";
   const kab = C.iKabupaten >= 0 ? getCell(C.iKabupaten) : "";
   const fak = C.iFaktur >= 0 ? getCell(C.iFaktur) : "";
+  const outletCode = C.iNoOutlet >= 0 ? getCell(C.iNoOutlet) : "";
+  const outletName = C.iNamaOutlet >= 0 ? getCell(C.iNamaOutlet) : "";
+  const pcode = C.iPcode >= 0 ? getCell(C.iPcode) : "";
+  const pcodeName = C.iNamaProduk >= 0 ? getCell(C.iNamaProduk) : "";
+  const channel = C.iChannel >= 0 ? getCell(C.iChannel) : "";
+  // Isi Karton per baris = QTYPCS dibagi ukuran 1 karton -- HASIL PECAHAN
+  // (mis. 5 botol dari karton isi 24 = 0.208 krt) SENGAJA tidak dibulatkan
+  // di sini, supaya saat dijumlahkan lintas banyak baris (per kecamatan/
+  // toko/channel) totalnya akurat -- membulatkan per-baris dulu akan
+  // menghilangkan kontribusi order kecil yang belum genap 1 karton.
+  const cartonSize = C.iKemasan >= 0 ? parseLbpCartonSize(getCell(C.iKemasan)) : 0;
+  const qtyPcs = C.iQtyPcs >= 0 ? (parseFloat(getCell(C.iQtyPcs)) || 0) : 0;
+  const karton = cartonSize > 0 ? qtyPcs / cartonSize : 0;
   return {
     date,
     periode: parseInt(periodeRaw, 10) || 0,
@@ -9363,7 +9482,13 @@ function buildLbpRow(getCell, C) {
     kecamatan: kec == null ? "" : String(kec).trim(),
     kabupaten: kab == null ? "" : String(kab).trim(),
     faktur: fak == null ? "" : String(fak).trim(),
-    omset: parseFloat(getCell(C.iHargaBruto)) || 0
+    omset: parseFloat(getCell(C.iHargaBruto)) || 0,
+    outletCode: outletCode == null ? "" : String(outletCode).trim(),
+    outletName: outletName == null ? "" : String(outletName).trim(),
+    pcode: pcode == null ? "" : String(pcode).trim(),
+    pcodeName: pcodeName == null ? "" : String(pcodeName).trim(),
+    channel: channel == null ? "" : String(channel).trim(),
+    karton
   };
 }
 
@@ -9406,6 +9531,11 @@ function parseLBP(workbook) {
         rec.kabupaten = intern(rec.kabupaten);
         rec.faktur = intern(rec.faktur);
         rec.date = intern(rec.date);
+        rec.outletCode = intern(rec.outletCode);
+        rec.outletName = intern(rec.outletName);
+        rec.pcode = intern(rec.pcode);
+        rec.pcodeName = intern(rec.pcodeName);
+        rec.channel = intern(rec.channel);
         rows.push(rec);
       }
     }
@@ -9426,7 +9556,8 @@ function parseLBP(workbook) {
        Huruf kolom untuk 7 kolom yang dipakai dihitung sekali saja di depan,
        lalu key sel cukup dirangkai dengan penggabungan string biasa. */
     const colLetter = {};
-    [C.iTgl, C.iFaktur, C.iHargaBruto, C.iKecamatan, C.iKabupaten, C.iPeriode, C.iSalesman]
+    [C.iTgl, C.iFaktur, C.iHargaBruto, C.iKecamatan, C.iKabupaten, C.iPeriode, C.iSalesman,
+     C.iNoOutlet, C.iNamaOutlet, C.iPcode, C.iNamaProduk, C.iKemasan, C.iQtyPcs, C.iChannel]
       .forEach(ci => { if (ci >= 0 && colLetter[ci] === undefined) colLetter[ci] = XLSX.utils.encode_col(ci); });
     const intern = makeInterner();
     for (let rIdx = range.s.r + 1; rIdx <= range.e.r; rIdx++) {
@@ -9443,6 +9574,11 @@ function parseLBP(workbook) {
         rec.kabupaten = intern(rec.kabupaten);
         rec.faktur = intern(rec.faktur);
         rec.date = intern(rec.date);
+        rec.outletCode = intern(rec.outletCode);
+        rec.outletName = intern(rec.outletName);
+        rec.pcode = intern(rec.pcode);
+        rec.pcodeName = intern(rec.pcodeName);
+        rec.channel = intern(rec.channel);
         rows.push(rec);
       }
     }
@@ -9506,7 +9642,8 @@ function parseLBPText(text) {
   if (C.iTgl < 0 || C.iHargaBruto < 0 || C.iSalesman < 0) {
     throw new Error("Format file LBP tidak dikenali (kolom Tanggal Faktur / Harga Bruto / Salesman tidak ditemukan).");
   }
-  const maxCol = Math.max(C.iTgl, C.iFaktur, C.iHargaBruto, C.iKecamatan, C.iKabupaten, C.iPeriode, C.iSalesman);
+  const maxCol = Math.max(C.iTgl, C.iFaktur, C.iHargaBruto, C.iKecamatan, C.iKabupaten, C.iPeriode, C.iSalesman,
+    C.iNoOutlet, C.iNamaOutlet, C.iPcode, C.iNamaProduk, C.iKemasan, C.iQtyPcs, C.iChannel);
 
   const intern = makeInterner();
   const rows = [];
@@ -9530,6 +9667,11 @@ function parseLBPText(text) {
           rec.kabupaten = intern(rec.kabupaten);
           rec.faktur = intern(rec.faktur);
           rec.date = intern(rec.date);
+          rec.outletCode = intern(rec.outletCode);
+          rec.outletName = intern(rec.outletName);
+          rec.pcode = intern(rec.pcode);
+          rec.pcodeName = intern(rec.pcodeName);
+          rec.channel = intern(rec.channel);
           rows.push(rec);
         }
       }
@@ -9551,6 +9693,323 @@ function fLbp() {
     (dimFilter.kecamatan === "ALL" || r.kecamatan === dimFilter.kecamatan) &&
     (dimFilter.kabupaten === "ALL" || r.kabupaten === dimFilter.kabupaten)
   );
+}
+/* Base filter utk 3 widget baru "Omset -- Wilayah, Toko/Pcode & Channel" --
+   SENGAJA tidak memakai fLbp() di atas (yang terikat lbpFilter/dimFilter
+   GLOBAL), karena tiap widget baru ini punya filter Divisi SENDIRI yang
+   independen. Tetap ikut filter tanggal global (inRange) supaya konsisten
+   dengan seluruh ribbon Omset lainnya. */
+function fLbpBase(divisionsSet) {
+  return DB.lbp.filter(r =>
+    inRange(r.date) &&
+    (r.division === "UNCLASSIFIED" || divisionsSet.has(r.division) || r.division === "M1")
+  );
+}
+/* Tabel riwayat order (dipakai bersama oleh widget "Cari Toko/Pcode" dan
+   detail klik-Channel) -- No, Tanggal, Toko, Pcode, Pcode Name, Harga Bruto,
+   Isi Karton, dengan baris TOTAL di tfoot (dihitung dari SELURUH baris yang
+   cocok, bukan hanya yang ditampilkan kalau kena HARD_CAP). */
+function lbpOrderDetailTableHtml(rows) {
+  if (!rows.length) return '<div class="exec-empty">Tidak ada data untuk ditampilkan.</div>';
+  const totalOmset = rows.reduce((a, r) => a + r.omset, 0);
+  const totalKarton = rows.reduce((a, r) => a + (r.karton || 0), 0);
+  return `
+    <table class="ar-table">
+      <thead><tr>
+        <th>No</th><th>Tanggal</th><th>Toko</th><th>Pcode</th><th>Pcode Name</th>
+        <th style="text-align:right;">Harga Bruto</th><th style="text-align:right;">Isi Karton</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map((r, i) => `<tr>
+          <td>${i + 1}</td>
+          <td>${fmtDateID(r.date)}</td>
+          <td>${r.outletName || ""}</td>
+          <td>${r.pcode || ""}</td>
+          <td>${r.pcodeName || ""}</td>
+          <td style="text-align:right;">${fmtRp(r.omset)}</td>
+          <td style="text-align:right;">${fmtNum(r.karton || 0, 2)}</td>
+        </tr>`).join("")}
+      </tbody>
+      <tfoot>
+        <tr style="font-weight:800; border-top:2px solid var(--line);">
+          <td colspan="5">TOTAL — ${fmtInt(rows.length)} baris</td>
+          <td style="text-align:right;">${fmtRp(totalOmset)}</td>
+          <td style="text-align:right;">${fmtNum(totalKarton, 2)}</td>
+        </tr>
+      </tfoot>
+    </table>`;
+}
+/* ---- Widget A: Ringkasan Wilayah (Kecamatan & Kabupaten/Kota) ---- */
+function renderOmsetWilayah() {
+  const kecSel = document.getElementById("omsetWilayahKecamatanSelect");
+  const kabSel = document.getElementById("omsetWilayahKabupatenSelect");
+  const kecKpiWrap = document.getElementById("omsetWilayahKecKpi");
+  const kabKpiWrap = document.getElementById("omsetWilayahKabKpi");
+  if (!kecKpiWrap || !kabKpiWrap) return;
+  const base = fLbpBase(omsetWilayahFilter.divisions);
+  const kecVal = kecSel ? kecSel.value : "ALL";
+  const kabVal = kabSel ? kabSel.value : "ALL";
+  if (!kecVal || kecVal === "ALL") {
+    kecKpiWrap.innerHTML = `<div class="exec-empty" style="grid-column:1/-1;">Pilih Kecamatan di atas untuk melihat Total Isi Karton &amp; Total Omset-nya.</div>`;
+  } else {
+    const rows = base.filter(r => r.kecamatan === kecVal);
+    const karton = rows.reduce((a, r) => a + (r.karton || 0), 0);
+    const omset = rows.reduce((a, r) => a + r.omset, 0);
+    kecKpiWrap.innerHTML = `
+      <div class="card kpi-card">
+        <div class="icon-circle">${ico('box')}</div>
+        <div class="body"><div class="label">Total Isi Karton — Kec. ${kecVal}</div><div class="value">${fmtNum(karton, 2)}</div></div>
+      </div>
+      <div class="card kpi-card">
+        <div class="icon-circle">${ico('money')}</div>
+        <div class="body"><div class="label">Total Omset (Harga Bruto) — Kec. ${kecVal}</div><div class="value money">${fmtRp(omset)}</div></div>
+      </div>`;
+  }
+  if (!kabVal || kabVal === "ALL") {
+    kabKpiWrap.innerHTML = `<div class="exec-empty" style="grid-column:1/-1;">Pilih Kabupaten/Kota di atas untuk melihat Total Isi Karton &amp; Total Omset-nya.</div>`;
+  } else {
+    const rows = base.filter(r => r.kabupaten === kabVal);
+    const karton = rows.reduce((a, r) => a + (r.karton || 0), 0);
+    const omset = rows.reduce((a, r) => a + r.omset, 0);
+    kabKpiWrap.innerHTML = `
+      <div class="card kpi-card">
+        <div class="icon-circle">${ico('box')}</div>
+        <div class="body"><div class="label">Total Isi Karton — Kab./Kota ${kabVal}</div><div class="value">${fmtNum(karton, 2)}</div></div>
+      </div>
+      <div class="card kpi-card">
+        <div class="icon-circle">${ico('money')}</div>
+        <div class="body"><div class="label">Total Omset (Harga Bruto) — Kab./Kota ${kabVal}</div><div class="value money">${fmtRp(omset)}</div></div>
+      </div>`;
+  }
+}
+function buildOmsetWilayahDropdowns() {
+  const kecSel = document.getElementById("omsetWilayahKecamatanSelect");
+  const kabSel = document.getElementById("omsetWilayahKabupatenSelect");
+  if (!kecSel || !kabSel) return;
+  const kecSet = new Set(), kabSet = new Set();
+  DB.lbp.forEach(r => {
+    if (r.kecamatan) kecSet.add(r.kecamatan);
+    if (r.kabupaten) kabSet.add(r.kabupaten);
+  });
+  const mk = (sel, set, placeholder) => {
+    const current = sel.value;
+    const list = Array.from(set).sort();
+    sel.innerHTML = `<option value="ALL">${placeholder}</option>` + list.map(v => `<option value="${v.replace(/"/g, "&quot;")}">${v}</option>`).join("");
+    sel.value = list.includes(current) ? current : "ALL";
+  };
+  mk(kecSel, kecSet, "Pilih Kecamatan...");
+  mk(kabSel, kabSet, "Pilih Kabupaten/Kota...");
+}
+/* ---- Widget B: Cari Toko / Pcode ---- */
+function omsetSearchResults() {
+  const q = omsetSearchFilter.query.trim().toLowerCase();
+  if (!q) return [];
+  const base = fLbpBase(omsetSearchFilter.divisions);
+  return base.filter(r =>
+    (r.outletName && r.outletName.toLowerCase().includes(q)) ||
+    (r.pcode && r.pcode.toLowerCase().includes(q)) ||
+    (r.pcodeName && r.pcodeName.toLowerCase().includes(q))
+  );
+}
+function renderOmsetSearch() {
+  const countEl = document.getElementById("omsetSearchCount");
+  const kpiWrap = document.getElementById("omsetSearchKpiRow");
+  const wrap = document.getElementById("omsetSearchWrap");
+  if (!wrap) return;
+  const q = omsetSearchFilter.query.trim();
+  if (!q) {
+    if (countEl) countEl.textContent = "Ketik nama Toko, atau kode/nama Pcode, untuk mencari riwayat order.";
+    if (kpiWrap) kpiWrap.innerHTML = "";
+    wrap.innerHTML = "";
+    return;
+  }
+  // Minimum 3 karakter, sama seperti "Cari PCode" di EDI RO -- mencegah
+  // render tabel besar berulang kali saat user masih mengetik.
+  if (q.length < 3) {
+    if (countEl) countEl.textContent = "Ketik minimal 3 karakter untuk mulai mencari.";
+    if (kpiWrap) kpiWrap.innerHTML = "";
+    wrap.innerHTML = "";
+    return;
+  }
+  const allResults = omsetSearchResults();
+  const HARD_CAP = 2000;
+  const truncated = allResults.length > HARD_CAP;
+  const rows = allResults.slice(0, HARD_CAP).sort((a, b) => a.date.localeCompare(b.date));
+  if (countEl) {
+    countEl.textContent = allResults.length
+      ? (truncated
+        ? `Menampilkan ${fmtInt(HARD_CAP)} dari ${fmtInt(allResults.length)} baris untuk "${q}" — perjelas kata pencarian Anda untuk melihat sisanya.`
+        : `${fmtInt(allResults.length)} baris order ditemukan untuk "${q}"`)
+      : `Tidak ada order ditemukan untuk "${q}" pada periode/divisi terfilter.`;
+  }
+  // Ringkasan Total Omset & Total Karton di ATAS (dihitung dari SELURUH hasil
+  // yang cocok, BUKAN cuma yang ditampilkan kalau kena HARD_CAP) -- supaya
+  // user tidak perlu scroll ke bawah dulu utk lihat totalnya. Baris TOTAL di
+  // tfoot tabel (lbpOrderDetailTableHtml) tetap dipertahankan seperti semula.
+  if (kpiWrap) {
+    if (!allResults.length) {
+      kpiWrap.innerHTML = "";
+    } else {
+      const totalOmset = allResults.reduce((a, r) => a + r.omset, 0);
+      const totalKarton = allResults.reduce((a, r) => a + (r.karton || 0), 0);
+      kpiWrap.innerHTML = `
+        <div class="card kpi-card">
+          <div class="icon-circle">${ico('money')}</div>
+          <div class="body"><div class="label">Total Omset (Harga Bruto) — "${q}"</div><div class="value money">${fmtRp(totalOmset)}</div></div>
+        </div>
+        <div class="card kpi-card">
+          <div class="icon-circle">${ico('box')}</div>
+          <div class="body"><div class="label">Total Isi Karton — "${q}"</div><div class="value">${fmtNum(totalKarton, 2)}</div></div>
+        </div>`;
+    }
+  }
+  wrap.innerHTML = lbpOrderDetailTableHtml(rows);
+}
+/* ---- Widget C: Channel Penyumbang Omset (Terbesar & Terkecil) ---- */
+function omsetChannelSummary(rows) {
+  const map = new Map();
+  rows.forEach(r => {
+    if (!r.channel) return;
+    if (!map.has(r.channel)) map.set(r.channel, { channel: r.channel, karton: 0, omset: 0, count: 0, tokoSet: new Set() });
+    const o = map.get(r.channel);
+    o.karton += (r.karton || 0);
+    o.omset += r.omset;
+    o.count++;
+    // Toko unik = outletCode kalau ada (paling akurat, tahan thd nama toko
+    // yang sama persis tapi beda cabang/kode), fallback ke outletName kalau
+    // outletCode kosong.
+    const tokoKey = r.outletCode || r.outletName;
+    if (tokoKey) o.tokoSet.add(tokoKey);
+  });
+  return Array.from(map.values())
+    .map(o => ({ channel: o.channel, karton: o.karton, omset: o.omset, count: o.count, tokoCount: o.tokoSet.size }))
+    .sort((a, b) => b.omset - a.omset);
+}
+function renderOmsetChannel() {
+  const wrap = document.getElementById("omsetChannelRankWrap");
+  if (!wrap) return;
+  const base = fLbpBase(omsetChannelFilter.divisions);
+  const summary = omsetChannelSummary(base);
+  if (!summary.length) {
+    wrap.innerHTML = '<div class="exec-empty">Belum ada data Channel pada periode/divisi yang difilter.</div>';
+    return;
+  }
+  const maxOmset = summary[0].omset;
+  const minOmset = summary[summary.length - 1].omset;
+  // Grand Total di baris paling bawah -- Karton & Omset tinggal dijumlah dari
+  // tiap Channel (aditif, tidak ada risiko dobel hitung). Grand Total Toko
+  // SENGAJA dihitung ULANG dari data mentah (bukan menjumlah tokoCount tiap
+  // Channel), karena 1 toko yang sama bisa order di lebih dari 1 Channel --
+  // kalau tokoCount tiap baris dijumlah langsung, toko itu akan terhitung
+  // dobel/lebih di Grand Total-nya.
+  const grandKarton = summary.reduce((a, s) => a + s.karton, 0);
+  const grandOmset = summary.reduce((a, s) => a + s.omset, 0);
+  const grandTokoSet = new Set();
+  base.forEach(r => {
+    if (!r.channel) return;
+    const k = r.outletCode || r.outletName;
+    if (k) grandTokoSet.add(k);
+  });
+  wrap.innerHTML = `
+    <table class="ar-table">
+      <thead><tr>
+        <th>No</th><th>Channel</th><th style="text-align:right;">Jumlah Toko</th>
+        <th style="text-align:right;">Total Isi Karton</th>
+        <th style="text-align:right;">Total Omset (Harga Bruto)</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${summary.map((s, i) => `
+          <tr class="omset-channel-row" data-channel-idx="${i}" style="cursor:pointer;">
+            <td>${i + 1}</td>
+            <td>${s.channel}${s.omset === maxOmset ? ' <span style="color:var(--c-green); font-weight:700; font-size:10px; border:1px solid var(--c-green); padding:1px 6px; border-radius:6px; margin-left:6px;">TERBESAR</span>' : ""}${(s.omset === minOmset && summary.length > 1) ? ' <span style="color:var(--c-red); font-weight:700; font-size:10px; border:1px solid var(--c-red); padding:1px 6px; border-radius:6px; margin-left:6px;">TERKECIL</span>' : ""}</td>
+            <td style="text-align:right;">${fmtInt(s.tokoCount)}</td>
+            <td style="text-align:right;">${fmtNum(s.karton, 2)}</td>
+            <td style="text-align:right;">${fmtRp(s.omset)}</td>
+            <td style="text-align:right; color:var(--accent); font-weight:700; white-space:nowrap;">Lihat detail ›</td>
+          </tr>`).join("")}
+      </tbody>
+      <tfoot>
+        <tr style="font-weight:800; border-top:2px solid var(--line);">
+          <td colspan="2">GRAND TOTAL — ${fmtInt(summary.length)} Channel</td>
+          <td style="text-align:right;">${fmtInt(grandTokoSet.size)}</td>
+          <td style="text-align:right;">${fmtNum(grandKarton, 2)}</td>
+          <td style="text-align:right;">${fmtRp(grandOmset)}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>`;
+  wrap.querySelectorAll("[data-channel-idx]").forEach(tr => {
+    tr.addEventListener("click", () => {
+      const idx = parseInt(tr.getAttribute("data-channel-idx"), 10);
+      omsetChannelFilter.selected = summary[idx].channel;
+      renderOmsetChannelDetail();
+    });
+  });
+}
+function renderOmsetChannelDetail() {
+  const box = document.getElementById("omsetChannelDetailBox");
+  if (!box) return;
+  const sel = omsetChannelFilter.selected;
+  if (!sel) { box.style.display = "none"; return; }
+  const titleEl = document.getElementById("omsetChannelDetailTitle");
+  const countEl = document.getElementById("omsetChannelDetailCount");
+  const wrap = document.getElementById("omsetChannelDetailWrap");
+  box.style.display = "";
+  if (titleEl) titleEl.textContent = `Rincian Order — Channel: ${sel}`;
+  const base = fLbpBase(omsetChannelFilter.divisions);
+  const allResults = base.filter(r => r.channel === sel);
+  const HARD_CAP = 2000;
+  const truncated = allResults.length > HARD_CAP;
+  const rows = allResults.slice(0, HARD_CAP).sort((a, b) => a.date.localeCompare(b.date));
+  if (countEl) {
+    countEl.textContent = truncated
+      ? `Menampilkan ${fmtInt(HARD_CAP)} dari ${fmtInt(allResults.length)} baris untuk Channel "${sel}" — persempit filter Divisi/tanggal untuk melihat sisanya.`
+      : `${fmtInt(allResults.length)} baris order untuk Channel "${sel}"`;
+  }
+  if (wrap) wrap.innerHTML = lbpOrderDetailTableHtml(rows);
+}
+/* ---- Wrapper utk RENDER_ALL_ENTRIES (dipanggil tiap kali ribbon Omset perlu digambar ulang) ---- */
+function renderOmsetDetailDependent() {
+  renderOmsetWilayah();
+  renderOmsetSearch();
+  renderOmsetChannel();
+  renderOmsetChannelDetail();
+}
+/* Bangun 3 grup chip filter Divisi INDEPENDEN utk widget2 di atas, sekaligus
+   wiring tombol "Pilih Semua"/"Kosongkan" masing2 (mengikuti pola
+   buildDivisionChips(), tapi diparameterkan supaya tidak menduplikasi kode
+   3x). */
+function buildOmsetDetailFilterUI() {
+  const specs = [
+    { listId: "omsetWilayahDivisionList", allId: "omsetWilayahDivAll", noneId: "omsetWilayahDivNone", attr: "data-owdiv", state: omsetWilayahFilter, render: renderOmsetWilayah },
+    { listId: "omsetSearchDivisionList", allId: "omsetSearchDivAll", noneId: "omsetSearchDivNone", attr: "data-osdiv", state: omsetSearchFilter, render: renderOmsetSearch },
+    { listId: "omsetChannelDivisionList", allId: "omsetChannelDivAll", noneId: "omsetChannelDivNone", attr: "data-ocdiv", state: omsetChannelFilter, render: () => { renderOmsetChannel(); renderOmsetChannelDetail(); } }
+  ];
+  specs.forEach(spec => {
+    const wrap = document.getElementById(spec.listId);
+    if (!wrap) return;
+    wrap.innerHTML = DIVISIONS.map(d => `<span class="chip active" ${spec.attr}="${d}">${d}</span>`).join("");
+    wrap.querySelectorAll(`[${spec.attr}]`).forEach(chip => {
+      chip.addEventListener("click", () => {
+        const d = chip.getAttribute(spec.attr);
+        if (spec.state.divisions.has(d)) { spec.state.divisions.delete(d); chip.classList.remove("active"); }
+        else { spec.state.divisions.add(d); chip.classList.add("active"); }
+        spec.render();
+      });
+    });
+    const allBtn = document.getElementById(spec.allId);
+    const noneBtn = document.getElementById(spec.noneId);
+    if (allBtn) allBtn.addEventListener("click", () => {
+      spec.state.divisions = new Set(DIVISIONS);
+      wrap.querySelectorAll(`[${spec.attr}]`).forEach(c => c.classList.add("active"));
+      spec.render();
+    });
+    if (noneBtn) noneBtn.addEventListener("click", () => {
+      spec.state.divisions = new Set();
+      wrap.querySelectorAll(`[${spec.attr}]`).forEach(c => c.classList.remove("active"));
+      spec.render();
+    });
+  });
 }
 function lbpOmsetTotal(rows) { return rows.reduce((a, r) => a + r.omset, 0); }
 function lbpCountDistinct(rows, field) { return new Set(rows.map(r => r[field]).filter(Boolean)).size; }
@@ -15115,6 +15574,7 @@ const RENDER_ALL_ENTRIES = [
   { page: "omset", fn: renderLbpKabupaten },
   { page: "omset", fn: renderLbpSalesman },
   { page: "omset", fn: renderLbpDivTrend },
+  { page: "omset", fn: renderOmsetDetailDependent },
   { page: "home", fn: renderLbpDivTrendHome },
   { page: "warehouse", fn: renderWarehouseMode },
   { page: "ar", fn: renderArDependent },
@@ -15281,6 +15741,7 @@ function handleLbpFile(file) {
         rows = null;
         setUploadStatus("lbp", `<b>${file.name}</b><br>${fmtInt(DB.lbp.length)} baris • ${summarizeRange(DB.lbp)}`, true);
         buildDimDropdowns();
+        buildOmsetWilayahDropdowns();
         updateDateBounds();
         renderAll();
         showToast(`Berhasil memuat ${file.name}`, "success");
@@ -16221,6 +16682,15 @@ function resetAllData() {
   buildReasonCheckboxes();
   buildDivisionChips();
   buildDimDropdowns();
+  omsetWilayahFilter.divisions = new Set(DIVISIONS);
+  omsetSearchFilter.divisions = new Set(DIVISIONS);
+  omsetSearchFilter.query = "";
+  omsetChannelFilter.divisions = new Set(DIVISIONS);
+  omsetChannelFilter.selected = null;
+  const omsetSearchInputReset = document.getElementById("omsetSearchInput");
+  if (omsetSearchInputReset) omsetSearchInputReset.value = "";
+  buildOmsetDetailFilterUI();
+  buildOmsetWilayahDropdowns();
   buildBsFilterUI();
   buildArFilterUI();
   const arModeSelectReset = document.getElementById("arModeSelect");
@@ -16535,7 +17005,10 @@ Object.assign(RENDER_FN, {
   mydexScanChart: renderMydexScanChart,
   mydexReportWrap: renderMydexReportTable,
   mydexDetailWrap: renderMydexDetailTable,
-  inboundProses: renderInboundProsesChart
+  inboundProses: renderInboundProsesChart,
+  omsetWilayahWrap: renderOmsetWilayah,
+  omsetSearchWrap: renderOmsetSearch,
+  omsetChannelWrap: renderOmsetChannel
 });
 async function captureChartImage(chartId, format = "jpeg", quality = 0.9) {
   const canvas = document.getElementById(`chart-${chartId}`);
@@ -17911,6 +18384,8 @@ function init() {
   buildReasonCheckboxes();
   buildDivisionChips();
   buildDimDropdowns();
+  buildOmsetDetailFilterUI();
+  buildOmsetWilayahDropdowns();
   buildBsFilterUI();
   buildArFilterUI();
   buildExportList();
@@ -18650,6 +19125,29 @@ function init() {
   if (eroSalesmanFilterSelect) eroSalesmanFilterSelect.addEventListener("change", (e) => {
     eroSalesmanFilter.salesman = e.target.value;
     renderEroPcodeSearchTable();
+  });
+  // ---- Wiring 3 widget baru "Omset -- Wilayah, Toko/Pcode & Channel" ----
+  const omsetWilayahKecSel = document.getElementById("omsetWilayahKecamatanSelect");
+  if (omsetWilayahKecSel) omsetWilayahKecSel.addEventListener("change", renderOmsetWilayah);
+  const omsetWilayahKabSel = document.getElementById("omsetWilayahKabupatenSelect");
+  if (omsetWilayahKabSel) omsetWilayahKabSel.addEventListener("change", renderOmsetWilayah);
+  const omsetSearchInputEl = document.getElementById("omsetSearchInput");
+  if (omsetSearchInputEl) {
+    // Debounce 350ms, sama seperti "Cari PCode" di EDI RO.
+    let omsetSearchDebounce = null;
+    omsetSearchInputEl.addEventListener("input", (e) => {
+      const val = e.target.value;
+      clearTimeout(omsetSearchDebounce);
+      omsetSearchDebounce = setTimeout(() => {
+        omsetSearchFilter.query = val;
+        renderOmsetSearch();
+      }, 350);
+    });
+  }
+  const omsetChannelDetailCloseBtn = document.getElementById("omsetChannelDetailClose");
+  if (omsetChannelDetailCloseBtn) omsetChannelDetailCloseBtn.addEventListener("click", () => {
+    omsetChannelFilter.selected = null;
+    renderOmsetChannelDetail();
   });
   const eroSalesmanAnalysisSelect = document.getElementById("eroSalesmanAnalysisSelect");
   if (eroSalesmanAnalysisSelect) eroSalesmanAnalysisSelect.addEventListener("change", renderEroSalesmanAnalysis);

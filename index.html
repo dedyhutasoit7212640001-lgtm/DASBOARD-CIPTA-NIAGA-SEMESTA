@@ -217,6 +217,31 @@
   .grid-kpi-8{grid-template-columns:repeat(8,1fr); gap:12px;}
   @media (max-width:1600px){ .grid-kpi-8{grid-template-columns:repeat(4,1fr);} }
   @media (max-width:900px){ .grid-kpi-8{grid-template-columns:repeat(2,1fr);} }
+  /* 6 KPI Bad Stock (4 utama + 2 tambahan: Divisi & Picode penyumbang BS
+     terbanyak) -- kolom TETAP spt .grid-kpi-8, supaya ke-6 kartu muat rata
+     dalam SATU baris (bukan 5+1 spt kalau pakai .grid-kpi auto-fit biasa). */
+  .grid-kpi-6{grid-template-columns:repeat(6,1fr); gap:10px;}
+  /* Breakpoint SENGAJA ditahan turun sampai 900px (bukan 1400px spt
+     sebelumnya) -- user secara eksplisit minta ke-6 kartu SELALU sejajar
+     satu baris di ukuran layar desktop/laptop biasa (1366/1440/1600px dst
+     semua masih di atas 900px), baru pecah ke 3/2 kolom di lebar yg
+     benar2 sempit (tablet/mobile). */
+  @media (max-width:900px){ .grid-kpi-6{grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:640px){ .grid-kpi-6{grid-template-columns:repeat(2,1fr);} }
+  /* Kartu KPI di dalam grid 6-kolom ini LEBIH SEMPIT dari kartu KPI biasa
+     (yang auto-fit minimal 190px) -- ukuran font/ikon/padding bawaan
+     kpi-card ternyata kepotong (nilai Rupiah besar spt "Rp 9.762.729"
+     melebihi lebar sisa body & terpotong tanpa terlihat, krn kpi-card
+     punya overflow:hidden + border-radius). Diperkecil supaya MUAT tanpa
+     terpotong; white-space:normal dipasang sbg jaring pengaman tambahan
+     (kalau suatu saat nilainya lebih besar lagi, akan turun ke baris
+     berikutnya, BUKAN kepotong senyap spt sebelumnya). */
+  .grid-kpi-6 .kpi-card{padding:14px 12px; gap:8px;}
+  .grid-kpi-6 .kpi-card .icon-circle{width:38px; height:38px; font-size:16px;}
+  .grid-kpi-6 .kpi-card .label{font-size:9px;}
+  .grid-kpi-6 .kpi-card .value{font-size:16px;}
+  .grid-kpi-6 .kpi-card .value.money{font-size:13px; white-space:normal; word-break:break-word; line-height:1.15;}
+  .grid-kpi-6 .kpi-card .sub{font-size:9.5px;}
   .stock-ringkasan-row.active > td{background:var(--accent-soft) !important; font-weight:700;}
   @media (max-width:1100px){ .grid-3,.grid-2,.grid-4{grid-template-columns:repeat(2,1fr);} }
   @media (max-width:640px){ .grid-3,.grid-2,.grid-4{grid-template-columns:1fr;} nav.navpills{display:none;} }
@@ -2154,6 +2179,12 @@
   .ar-table tbody tr{position:relative; transition:background .12s ease;}
   .ar-table tbody tr:hover{background:var(--accent-soft) !important;}
 
+  /* Breadcrumb drill-down "Ringkasan Bad Stock" (Channel -> Toko -> Picode) */
+  .bs-crumb{color:var(--accent); font-weight:700; text-decoration:none;}
+  .bs-crumb:hover{text-decoration:underline;}
+  .bs-crumb-sep{color:var(--sub); margin:0 4px;}
+  .bs-crumb-current{color:var(--text); font-weight:700;}
+
   /* ---- 2. Judul & label bergaya digital readout ----
      Aksen garis vertikal kecil + kurung siku tipis di depan judul kartu,
      mengesankan "label terminal" -- angka KPI besar dipertegas monospace. */
@@ -2952,8 +2983,10 @@
         </div>
       </div>
 
-      <div class="grid grid-kpi" id="bsKpiRow"></div>
+      <div class="grid grid-kpi-6" id="bsKpiRow"></div>
 
+      <!-- Urutan sesuai permintaan: KPI -> Grafik Donat (PY Donut) -> lalu
+           tabel Ringkasan Bad Stock -> baru grafik2 lainnya. -->
       <div class="grid grid-2" style="margin-top:16px;">
         <div class="card chart-card" data-chart-id="bsDonut" data-chart-title="Bad Stock per Divisi">
           <div class="card-top">
@@ -2969,6 +3002,16 @@
           <div class="desc">Kontribusi Bad Stock tertinggi per salesman</div>
           <div id="bsTop5List" style="margin-top:8px;"></div>
         </div>
+      </div>
+
+      <!-- ===== Ringkasan Bad Stock: drill-down Channel -> Toko -> Picode ===== -->
+      <div class="card chart-card" data-chart-id="bsChannelSummaryWrap" data-chart-title="Bad Stock - Ringkasan per Channel" style="margin-top:16px;">
+        <div class="card-top">
+          <div class="titles"><h3>📋 Ringkasan Bad Stock</h3><div class="desc">Per Channel — klik "Detail" untuk melihat Toko di dalamnya, lalu Picode per Toko. Mengikuti filter Divisi/Periode/Salesman/Reason/Toko di atas.</div></div>
+        </div>
+        <div id="bsChannelBreadcrumb" style="font-size:12px; margin-bottom:8px;"></div>
+        <div class="table-export-row"><button class="table-export-btn" data-export-table="bsChannelSummaryWrap" data-export-name="BadStock_RingkasanChannel">⬇️ Excel</button></div>
+        <div id="bsChannelSummaryWrap" style="margin-top:8px; max-height:520px; overflow:auto;"></div>
       </div>
 
       <div class="grid grid-2" style="margin-top:16px;">
@@ -5764,7 +5807,25 @@ function showPage(page) {
       if (group) group.open = true;
     }
   });
-  document.getElementById("top").scrollIntoView({ behavior: "instant", block: "start" });
+  // PENTING (perbaikan performa navigasi, lanjutan): scrollIntoView() PERLU
+  // posisi/ukuran elemen yang sudah dihitung ulang (layout) -- kalau
+  // dipanggil LANGSUNG di sini (synchronous, di tengah showPage()), browser
+  // TERPAKSA menghentikan eksekusi JS sejenak untuk memaksa hitung ulang
+  // layout SEKARANG JUGA ("forced synchronous layout"/reflow) sebelum bisa
+  // menjawab posisi scroll yang benar -- padahal halaman yang baru saja
+  // ditampilkan (content-visibility:hidden -> visible) bisa berukuran besar
+  // (banyak tabel/chart), jadi hitung ulang layout-nya ikut mahal & BLOK
+  // main thread di tengah klik nav (diukur: ~45-105ms utk ribbon dgn tabel
+  // besar spt Stock/Utilisasi MyDex, vs <1ms utk ribbon ringan spt Home).
+  // Fix: pindahkan ke requestAnimationFrame yg SAMA dgn resize() chart di
+  // bawah -- browser tetap menghitung layout yg sama, tapi sbg BAGIAN dari
+  // siklus render alami (sebelum paint berikutnya), bukan interupsi paksa
+  // di tengah JS -- klik nav jadi terasa instan, layout tetap beres SEBELUM
+  // frame berikutnya sempat digambar (jadi user tidak melihat "lompatan"
+  // posisi scroll sama sekali, persis spt sebelumnya).
+  requestAnimationFrame(() => {
+    document.getElementById("top").scrollIntoView({ behavior: "instant", block: "start" });
+  });
   // PENTING (perbaikan performa navigasi): resize() SEBELUMNYA dipanggil
   // pada SEMUA Chart.js instance yg pernah dibuat di seluruh dashboard
   // (bisa 40+ chart stlh semua sumber data diupload), termasuk yg sedang
@@ -6719,6 +6780,14 @@ function parseBSFile(text) {
   const idx = name => header.indexOf(name);
   const iBulan = idx("BULAN"), iTahun = idx("TAHUN"), iOutlet = idx("NAMA_OUTLET"),
     iSalesman = idx("NAMA_SALESMAN"), iNominal = idx("TOTAL_NOMINAL");
+  // Kolom tambahan (dipakai fitur "Ringkasan Bad Stock" per Channel -> Toko
+  // -> Picode): KODE_OUTLET (kode toko), CHANNEL_OUTLET (mis. "RT - RETAIL
+  // SMALL"), KODE_BARANG (Picode/kode produk), NAMA_BARANG (nama produk).
+  // Dicek defensif (>= 0) supaya file lama yg mungkin tidak punya kolom ini
+  // tetap bisa diproses -- fitur channel/picode nanti otomatis kosong,
+  // TIDAK bikin seluruh upload gagal.
+  const iKodeOutlet = idx("KODE_OUTLET"), iChannel = idx("CHANNEL_OUTLET"),
+    iPicode = idx("KODE_BARANG"), iPicodeName = idx("NAMA_BARANG");
   const iReason = {};
   BS_REASON_ORDER.forEach(l => { iReason[l] = idx(l); });
   if (iNominal < 0 || iSalesman < 0) {
@@ -6749,10 +6818,18 @@ function parseBSFile(text) {
       if (ci >= 0 && (parseFloat(unq(cols[ci])) || 0) !== 0) { reason = l; break; }
     }
     const outlet = iOutlet >= 0 ? unq(cols[iOutlet]).trim() : "";
+    const kodeOutletRaw = iKodeOutlet >= 0 ? unq(cols[iKodeOutlet]).trim() : "";
+    const channelRaw = iChannel >= 0 ? unq(cols[iChannel]).trim() : "";
+    const picodeRaw = iPicode >= 0 ? unq(cols[iPicode]).trim() : "";
+    const picodeNameRaw = iPicodeName >= 0 ? unq(cols[iPicodeName]).trim() : "";
     rows.push({
       periode, periodeLabel: periode ? monthLabel(periode) : "-",
       division: cls.division, salesman: (salesman === "-" ? "" : salesman),
       outlet: (outlet === "-" || !outlet) ? "" : outlet,
+      kodeOutlet: (kodeOutletRaw === "-" || !kodeOutletRaw) ? "" : kodeOutletRaw,
+      channel: (channelRaw === "-" || !channelRaw) ? "" : channelRaw,
+      picode: (picodeRaw === "-" || !picodeRaw) ? "" : picodeRaw,
+      picodeName: (picodeNameRaw === "-" || !picodeNameRaw) ? "" : picodeNameRaw,
       reason, nominal
     });
   }
@@ -6791,6 +6868,99 @@ function bsByReason(rows) {
   BS_REASON_ORDER.forEach(l => sums[l] = 0);
   rows.forEach(r => { if (r.reason && sums[r.reason] !== undefined) sums[r.reason] += r.nominal; });
   return { labels: BS_REASON_ORDER.map(l => `${l} — ${BS_REASON_LEGEND[l]}`), codes: BS_REASON_ORDER, data: BS_REASON_ORDER.map(l => sums[l]) };
+}
+
+/* =========================================================================
+   RINGKASAN BAD STOCK — Channel -> Toko -> Picode (drill-down 3 tingkat)
+   Sumber kolom: CHANNEL_OUTLET, KODE_OUTLET/NAMA_OUTLET, KODE_BARANG/
+   NAMA_BARANG (lihat parseBSFile). Format persentase KHUSUS tabel ini:
+   SELALU 3 angka di belakang koma (beda dari aturan 2/5 desimal yg
+   dipakai ribbon Omset) -- sesuai permintaan eksplisit user.
+   ========================================================================= */
+function bsPctFmt(n) {
+  return fmtNum(Number(n) || 0, 3) + "%";
+}
+/* Total BS "keseluruhan" yg jadi PENYEBUT TETAP persentase di seluruh 3
+   tingkat drill-down (Channel/Toko/Picode) -- dihitung dari fBs() (filter
+   ribbon: Divisi/Periode/Salesman/Reason/Toko yg aktif), TAPI tidak
+   terpengaruh oleh drill-down channel/toko/picode itu sendiri -- persis
+   pola yg sama dipakai di Cut Cost (cutCostGrandTotalAll()): supaya angka
+   % selalu bisa dibaca sbg "porsi dari total BS (sesuai filter ribbon)",
+   bukan berubah-ubah tergantung level mana yg sedang dibuka. */
+function bsGrandTotalAll() { return bsTotal(fBs()); }
+/* State drill-down: null semua = tampilkan ringkasan per Channel.
+   channel terisi (kodeOutlet null) = tampilkan daftar Toko dlm channel itu.
+   Keduanya terisi = tampilkan daftar Picode dlm toko itu. */
+const bsChannelDrill = { channel: null, kodeOutlet: null };
+/* Level 1: ringkasan per Channel -- Total Picode (kode produk unik),
+   Total Toko (kode outlet unik), Nominal BS, diurutkan desc by nominal. */
+function bsChannelSummary(rows) {
+  const map = new Map(); // channel -> { picodes:Set, tokos:Set, nominal }
+  rows.forEach(r => {
+    const ch = r.channel || "(Tidak Diketahui)";
+    if (!map.has(ch)) map.set(ch, { picodes: new Set(), tokos: new Set(), nominal: 0 });
+    const o = map.get(ch);
+    if (r.picode) o.picodes.add(r.picode);
+    if (r.kodeOutlet) o.tokos.add(r.kodeOutlet);
+    o.nominal += r.nominal;
+  });
+  return Array.from(map.entries())
+    .map(([channel, o]) => ({ channel, jumlahPicode: o.picodes.size, jumlahToko: o.tokos.size, nominal: o.nominal }))
+    .sort((a, b) => b.nominal - a.nominal);
+}
+/* Level 2: ringkasan per Toko (KODE_OUTLET) DI DALAM satu channel --
+   Total Picode (kode produk unik utk toko itu), Nominal BS. */
+function bsStoreSummary(rows, channel) {
+  const filtered = rows.filter(r => (r.channel || "(Tidak Diketahui)") === channel);
+  const map = new Map(); // kodeOutlet -> { namaToko, picodes:Set, nominal }
+  filtered.forEach(r => {
+    const kode = r.kodeOutlet || "(Tidak Diketahui)";
+    if (!map.has(kode)) map.set(kode, { namaToko: r.outlet || "-", picodes: new Set(), nominal: 0 });
+    const o = map.get(kode);
+    if (r.picode) o.picodes.add(r.picode);
+    if ((!o.namaToko || o.namaToko === "-") && r.outlet) o.namaToko = r.outlet;
+    o.nominal += r.nominal;
+  });
+  return Array.from(map.entries())
+    .map(([kodeOutlet, o]) => ({ kodeOutlet, namaToko: o.namaToko, jumlahPicode: o.picodes.size, nominal: o.nominal }))
+    .sort((a, b) => b.nominal - a.nominal);
+}
+/* Level 3: ringkasan per Picode (KODE_BARANG) DI DALAM satu Toko spesifik
+   (channel + kodeOutlet) -- Nominal BS per produk. */
+function bsPicodeSummary(rows, channel, kodeOutlet) {
+  const filtered = rows.filter(r => (r.channel || "(Tidak Diketahui)") === channel && (r.kodeOutlet || "(Tidak Diketahui)") === kodeOutlet);
+  const map = new Map(); // picode -> { namaBarang, nominal }
+  filtered.forEach(r => {
+    const kode = r.picode || "(Tidak Diketahui)";
+    if (!map.has(kode)) map.set(kode, { namaBarang: r.picodeName || "-", nominal: 0 });
+    const o = map.get(kode);
+    if ((!o.namaBarang || o.namaBarang === "-") && r.picodeName) o.namaBarang = r.picodeName;
+    o.nominal += r.nominal;
+  });
+  return Array.from(map.entries())
+    .map(([picode, o]) => ({ picode, namaBarang: o.namaBarang, nominal: o.nominal }))
+    .sort((a, b) => b.nominal - a.nominal);
+}
+/* Utk 2 KPI tambahan: divisi & picode penyumbang BS terbanyak (nilai Rp). */
+function bsTopDivision(rows) {
+  const sums = {};
+  rows.forEach(r => { const d = r.division || "UNCLASSIFIED"; sums[d] = (sums[d] || 0) + r.nominal; });
+  let best = null;
+  Object.entries(sums).forEach(([d, v]) => { if (!best || v > best[1]) best = [d, v]; });
+  return best; // [division, nominal] atau null
+}
+function bsTopPicode(rows) {
+  const map = new Map(); // picode -> {namaBarang, nominal}
+  rows.forEach(r => {
+    if (!r.picode) return;
+    if (!map.has(r.picode)) map.set(r.picode, { namaBarang: r.picodeName || "-", nominal: 0 });
+    const o = map.get(r.picode);
+    o.nominal += r.nominal;
+    if ((!o.namaBarang || o.namaBarang === "-") && r.picodeName) o.namaBarang = r.picodeName;
+  });
+  let best = null;
+  map.forEach((o, picode) => { if (!best || o.nominal > best.nominal) best = { picode, ...o }; });
+  return best; // {picode, namaBarang, nominal} atau null
 }
 
 /* =========================================================================
@@ -10369,6 +10539,30 @@ function applyChartTheme() {
   Chart.defaults.elements.arc.borderWidth = 0;
   Chart.defaults.elements.arc.hoverOffset = 10;
 
+  // PENTING (perbaikan performa & "smoothness" perpindahan ribbon/filter):
+  // Chart.js SECARA DEFAULT memakai animasi "tumbuh dari nol" berdurasi
+  // 1000ms setiap kali sebuah chart dibuat -- dan HAMPIR SELURUH fungsi
+  // render di dashboard ini memakai pola destroyChart()+`new Chart(...)`
+  // (bukan chart.update()), jadi SETIAP kali ganti ribbon, ganti filter,
+  // atau ganti mode tampilan, PULUHAN chart yang ter-render ulang lewat
+  // antrian bertahap (renderAll()'s chunked queue) ikut menjalankan
+  // animasi 1 detik masing-masing, ber-tumpuk krn dimulai di rAF frame yg
+  // berbeda-beda -- inilah penyebab utama dashboard terasa "belum
+  // settle"/lamban & tersendat2 setelah pindah ribbon atau ganti filter,
+  // padahal proses re-render datanya sendiri sudah sangat cepat (chunked
+  // dgn budget 10ms/frame). Dipangkas jadi durasi singkat (bukan 0 total,
+  // supaya tetap terasa hidup/tidak "patah" saat memang chart baru pertama
+  // kali muncul) + easing lembut, dan transisi hover/aktif (mis. titik
+  // garis yg membesar saat disentuh tooltip) dibuat INSTAN supaya terasa
+  // responsif saat mouse bergerak cepat di atas grafik.
+  Chart.defaults.animation = { duration: 180, easing: "easeOutQuad" };
+  if (Chart.defaults.transitions) {
+    if (Chart.defaults.transitions.active) Chart.defaults.transitions.active.animation = { duration: 0 };
+    if (Chart.defaults.transitions.resize) Chart.defaults.transitions.resize.animation = { duration: 0 };
+  }
+  Chart.defaults.hover.animationDuration = 0;
+  Chart.defaults.responsiveAnimationDuration = 0;
+
   /* ---------------------------------------------------------------------
      PLUGIN "GLOW" -- memberi cahaya lembut pada garis/batang/arc dengan
      shadow canvas. Murni efek gambar (tidak menyentuh data/skala), jadi
@@ -11596,9 +11790,19 @@ function renderBsDonut() {
     options: styledOpts({
       cutout: "62%",
       scales: {},
+      // Padding ekstra kiri/kanan/bawah -- ruang utk label garis-keluar
+      // (leader-line) dari donutOutsideLabelsPlugin, sama seperti donut
+      // Tren Omset (lihat catatan panjang di plugin-nya) supaya label tidak
+      // terpotong tepi canvas.
+      layout: { padding: { top: 20, right: 92, bottom: 40, left: 92 } },
       plugins: {
         legend: { position: "bottom", labels: { color: textColor(), boxWidth: 12, font: { size: 11 } } },
-        tooltip: { callbacks: { label: (ctx) => { const pct = total ? (ctx.parsed / total * 100) : 0; return `${ctx.label}: ${fmtRp(ctx.parsed)} (${fmtNum(pct, 1)}%)`; } } }
+        tooltip: { callbacks: { label: (ctx) => { const pct = total ? (ctx.parsed / total * 100) : 0; return `${ctx.label}: ${fmtRp(ctx.parsed)} (${omsetPctFmt(pct)})`; } } },
+        // Garis keluar (leader-line) menampilkan nama Divisi + persentase +
+        // nilai Rp per slice -- SAMA PERSIS spt donut "Tren Omset" ribbon
+        // Omset (donutOutsideLabelsPlugin sudah digeneralisasi utk menerima
+        // canvas ini juga, lihat gate id di definisinya).
+        donutOutsideLabels: { enabled: true, textColor: textColor() }
       }
     })
   });
@@ -11664,6 +11868,8 @@ function renderBsKpi() {
   const pct = omset ? total / omset * 100 : 0;
   const salesmanCount = new Set(rows.filter(r => r.salesman).map(r => r.salesman)).size;
   const outletCount = new Set(rows.filter(r => r.outlet).map(r => r.outlet)).size;
+  const topDiv = bsTopDivision(rows);
+  const topPicode = bsTopPicode(rows);
   const wrap = document.getElementById("bsKpiRow");
   if (!wrap) return;
   wrap.innerHTML = `
@@ -11683,10 +11889,198 @@ function renderBsKpi() {
     <div class="card kpi-card">
       <div class="icon-circle">${ico('store')}</div>
       <div class="body"><div class="label">Toko Terlibat</div><div class="value">${fmtInt(outletCount)}</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico('sigma')}</div>
+      <div class="body"><div class="label">Divisi Penyumbang BS Terbanyak</div>
+        <div class="value">${topDiv ? topDiv[0] : "-"}</div>
+        <div class="sub">${topDiv ? `${fmtRp(topDiv[1])} • ${bsPctFmt(bsGrandTotalAll() ? topDiv[1] / bsGrandTotalAll() * 100 : 0)}` : "Belum ada data"}</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico('pin')}</div>
+      <div class="body"><div class="label">Picode BS Terbanyak</div>
+        <div class="value" style="font-size:13px; line-height:1.3; word-break:break-word;" title="${topPicode ? topPicode.namaBarang : ""}">${topPicode ? `${topPicode.picode} <span style="font-weight:600; font-size:10.5px; color:var(--sub);">— ${topPicode.namaBarang}</span>` : "-"}</div>
+        <div class="sub">${topPicode ? `${fmtRp(topPicode.nominal)} • ${bsPctFmt(bsGrandTotalAll() ? topPicode.nominal / bsGrandTotalAll() * 100 : 0)}` : "Belum ada data"}</div></div>
     </div>`;
 }
+/* Render tabel "📋 Ringkasan Bad Stock" -- drill-down 3 tingkat Channel ->
+   Toko -> Picode (lihat bsChannelSummary/bsStoreSummary/bsPicodeSummary di
+   dekat definisi DB.bs). Breadcrumb + tombol "Detail" per baris dipakai utk
+   naik/turun tingkat; grand total & % SELALU dihitung terhadap
+   bsGrandTotalAll() (total BS sesuai filter ribbon yg aktif -- Divisi/
+   Periode/Salesman/Reason/Toko), TIDAK berubah walau sedang drill-down ke
+   channel/toko manapun -- persis pola Cut Cost yg sudah disetujui user. */
+function renderBsChannelSummary() {
+  const wrap = document.getElementById("bsChannelSummaryWrap");
+  const crumbEl = document.getElementById("bsChannelBreadcrumb");
+  if (!wrap) return;
+  const rows = fBs();
+  const grand = bsGrandTotalAll();
+
+  // PENTING (kompatibilitas data lama): kolom channel/kodeOutlet/picode
+  // baru ditambahkan ke parser Bad Stock belakangan -- kalau data Bad Stock
+  // yg sedang aktif SEBENARNYA berasal dari sesi/upload SEBELUM pembaruan
+  // ini (mis. tersimpan di IndexedDB browser lalu dipulihkan otomatis saat
+  // dashboard versi baru dibuka TANPA upload ulang file-nya), baris2 lama
+  // itu tidak akan pernah punya field2 ini sama sekali -- hasilnya SEMUA
+  // baris jatuh ke "(Tidak Diketahui)"/"-" walau file aslinya punya kolom
+  // CHANNEL_OUTLET/KODE_BARANG lengkap. Deteksi kasus ini scara eksplisit
+  // (ada baris Bad Stock, tapi TIDAK SATUPUN yg punya channel/picode
+  // terisi) dan kasih tahu user supaya upload ulang file-nya -- upload
+  // ulang otomatis menimpa baris lama utk periode yg sama (lihat
+  // mergeBs()), jadi field baru langsung terisi tanpa perlu reset data.
+  if (rows.length && !rows.some(r => r.channel || r.picode || r.kodeOutlet)) {
+    wrap.innerHTML = `<div class="exec-empty" style="color:var(--sub);">⚠️ Data Bad Stock yang tersimpan saat ini berasal dari upload SEBELUM fitur Channel/Picode ditambahkan, jadi kolom ini belum terisi.<br>
+      Silakan <b>upload ulang</b> file Bad Stock (EDI PPBR) yang sama di kotak upload ribbon ini -- data akan diperbarui otomatis dan kolom Channel/Toko/Picode akan langsung terisi.</div>`;
+    if (crumbEl) crumbEl.innerHTML = "";
+    return;
+  }
+
+  // Fallback defensif: kalau channel/toko yg sedang di-drill sudah tidak
+  // ada lagi di data hasil filter saat ini (mis. user ganti filter Divisi
+  // sementara sedang membuka satu channel tertentu), naik otomatis ke
+  // tingkat yang masih valid -- supaya tidak menampilkan tabel kosong tanpa
+  // penjelasan atau breadcrumb yang "nyasar".
+  if (bsChannelDrill.channel) {
+    const chExists = bsChannelSummary(rows).some(o => o.channel === bsChannelDrill.channel);
+    if (!chExists) { bsChannelDrill.channel = null; bsChannelDrill.kodeOutlet = null; }
+  }
+  if (bsChannelDrill.channel && bsChannelDrill.kodeOutlet) {
+    const stExists = bsStoreSummary(rows, bsChannelDrill.channel).some(o => o.kodeOutlet === bsChannelDrill.kodeOutlet);
+    if (!stExists) bsChannelDrill.kodeOutlet = null;
+  }
+
+  if (crumbEl) {
+    const parts = [`<a href="#" class="bs-crumb" data-bs-crumb="root">📋 Semua Channel</a>`];
+    if (bsChannelDrill.channel) {
+      parts.push(`<span class="bs-crumb-sep">›</span><a href="#" class="bs-crumb" data-bs-crumb="channel">${bsChannelDrill.channel}</a>`);
+    }
+    if (bsChannelDrill.channel && bsChannelDrill.kodeOutlet) {
+      const st = bsStoreSummary(rows, bsChannelDrill.channel).find(s => s.kodeOutlet === bsChannelDrill.kodeOutlet);
+      const label = st ? `${bsChannelDrill.kodeOutlet} — ${st.namaToko}` : bsChannelDrill.kodeOutlet;
+      parts.push(`<span class="bs-crumb-sep">›</span><span class="bs-crumb-current">${label}</span>`);
+    }
+    crumbEl.innerHTML = parts.join(" ");
+    crumbEl.querySelectorAll("[data-bs-crumb]").forEach(a => {
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        const level = a.getAttribute("data-bs-crumb");
+        if (level === "root") { bsChannelDrill.channel = null; bsChannelDrill.kodeOutlet = null; }
+        else if (level === "channel") { bsChannelDrill.kodeOutlet = null; }
+        renderBsChannelSummary();
+      });
+    });
+  }
+
+  let html;
+  if (!bsChannelDrill.channel) {
+    // ---- LEVEL 1: ringkasan per Channel ----
+    const list = bsChannelSummary(rows);
+    if (!list.length) { wrap.innerHTML = '<div class="exec-empty">Belum ada data Channel untuk periode/filter ini.</div>'; return; }
+    const grandPicode = list.reduce((a, o) => a + o.jumlahPicode, 0);
+    const grandToko = list.reduce((a, o) => a + o.jumlahToko, 0);
+    const grandNominal = list.reduce((a, o) => a + o.nominal, 0);
+    html = `<table class="ar-table prestasi-table">
+      <thead><tr>
+        <th>No</th><th>Channel</th>
+        <th style="text-align:right;">Total Picode</th><th style="text-align:right;">Total Toko</th>
+        <th style="text-align:right;">Nominal BS</th><th style="text-align:right;">% BS</th><th>Detail</th>
+      </tr></thead>
+      <tbody>
+        ${list.map((o, i) => `<tr>
+          <td>${i + 1}</td><td>${o.channel}</td>
+          <td style="text-align:right;">${fmtInt(o.jumlahPicode)}</td>
+          <td style="text-align:right;">${fmtInt(o.jumlahToko)}</td>
+          <td style="text-align:right;">${fmtRp(o.nominal)}</td>
+          <td style="text-align:right;">${bsPctFmt(grand ? o.nominal / grand * 100 : 0)}</td>
+          <td><button class="btn btn-ghost btn-sm bs-channel-detail-btn" data-channel="${o.channel}" style="padding:4px 10px; font-size:11px;">🔍 Detail</button></td>
+        </tr>`).join("")}
+      </tbody>
+      <tfoot>
+        <tr style="font-weight:800; border-top:2px solid var(--line);">
+          <td colspan="2">GRAND TOTAL — ${fmtInt(list.length)} Channel</td>
+          <td style="text-align:right;">${fmtInt(grandPicode)}</td>
+          <td style="text-align:right;">${fmtInt(grandToko)}</td>
+          <td style="text-align:right;">${fmtRp(grandNominal)}</td>
+          <td style="text-align:right;">${bsPctFmt(grand ? grandNominal / grand * 100 : 0)}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>`;
+  } else if (!bsChannelDrill.kodeOutlet) {
+    // ---- LEVEL 2: ringkasan per Toko dalam channel terpilih ----
+    const list = bsStoreSummary(rows, bsChannelDrill.channel);
+    if (!list.length) { wrap.innerHTML = '<div class="exec-empty">Belum ada data Toko untuk channel ini.</div>'; return; }
+    const grandPicode = list.reduce((a, o) => a + o.jumlahPicode, 0);
+    const grandNominal = list.reduce((a, o) => a + o.nominal, 0);
+    html = `<table class="ar-table prestasi-table">
+      <thead><tr>
+        <th>No</th><th>Kode Toko</th><th>Nama Toko</th>
+        <th style="text-align:right;">Total Picode</th>
+        <th style="text-align:right;">Nominal BS</th><th style="text-align:right;">% BS</th><th>Detail</th>
+      </tr></thead>
+      <tbody>
+        ${list.map((o, i) => `<tr>
+          <td>${i + 1}</td><td>${o.kodeOutlet}</td><td>${o.namaToko}</td>
+          <td style="text-align:right;">${fmtInt(o.jumlahPicode)}</td>
+          <td style="text-align:right;">${fmtRp(o.nominal)}</td>
+          <td style="text-align:right;">${bsPctFmt(grand ? o.nominal / grand * 100 : 0)}</td>
+          <td><button class="btn btn-ghost btn-sm bs-store-detail-btn" data-kode-outlet="${o.kodeOutlet}" style="padding:4px 10px; font-size:11px;">🔍 Detail</button></td>
+        </tr>`).join("")}
+      </tbody>
+      <tfoot>
+        <tr style="font-weight:800; border-top:2px solid var(--line);">
+          <td colspan="3">GRAND TOTAL — ${fmtInt(list.length)} Toko</td>
+          <td style="text-align:right;">${fmtInt(grandPicode)}</td>
+          <td style="text-align:right;">${fmtRp(grandNominal)}</td>
+          <td style="text-align:right;">${bsPctFmt(grand ? grandNominal / grand * 100 : 0)}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>`;
+  } else {
+    // ---- LEVEL 3: ringkasan per Picode dalam satu Toko spesifik ----
+    const list = bsPicodeSummary(rows, bsChannelDrill.channel, bsChannelDrill.kodeOutlet);
+    if (!list.length) { wrap.innerHTML = '<div class="exec-empty">Belum ada data Picode untuk toko ini.</div>'; return; }
+    const grandNominal = list.reduce((a, o) => a + o.nominal, 0);
+    html = `<table class="ar-table prestasi-table">
+      <thead><tr>
+        <th>No</th><th>Kode Picode</th><th>Nama Barang</th>
+        <th style="text-align:right;">Nominal BS</th><th style="text-align:right;">% BS</th>
+      </tr></thead>
+      <tbody>
+        ${list.map((o, i) => `<tr>
+          <td>${i + 1}</td><td>${o.picode}</td><td>${o.namaBarang}</td>
+          <td style="text-align:right;">${fmtRp(o.nominal)}</td>
+          <td style="text-align:right;">${bsPctFmt(grand ? o.nominal / grand * 100 : 0)}</td>
+        </tr>`).join("")}
+      </tbody>
+      <tfoot>
+        <tr style="font-weight:800; border-top:2px solid var(--line);">
+          <td colspan="3">GRAND TOTAL — ${fmtInt(list.length)} Picode</td>
+          <td style="text-align:right;">${fmtRp(grandNominal)}</td>
+          <td style="text-align:right;">${bsPctFmt(grand ? grandNominal / grand * 100 : 0)}</td>
+        </tr>
+      </tfoot>
+    </table>`;
+  }
+  wrap.innerHTML = html;
+  wrap.querySelectorAll(".bs-channel-detail-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      bsChannelDrill.channel = btn.getAttribute("data-channel");
+      bsChannelDrill.kodeOutlet = null;
+      renderBsChannelSummary();
+    });
+  });
+  wrap.querySelectorAll(".bs-store-detail-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      bsChannelDrill.kodeOutlet = btn.getAttribute("data-kode-outlet");
+      renderBsChannelSummary();
+    });
+  });
+}
 function renderBsDependent() {
-  renderBsKpi(); renderBsDonut(); renderBsSalesman(); renderBsTop5(); renderBsOutlet(); renderBsReason();
+  renderBsKpi(); renderBsDonut(); renderBsSalesman(); renderBsTop5(); renderBsOutlet(); renderBsReason(); renderBsChannelSummary();
 }
 
 /* ---- Render: Grafik Frekuensi Opname Stock (Plus=hijau garis, Minus=merah garis, Total=kuning batang) ---- */
@@ -14840,7 +15234,7 @@ function renderLbpDivTrendGeneric(canvasId, chartKey, mode, periodMode) {
 const donutOutsideLabelsPlugin = {
   id: "donutOutsideLabels",
   afterDraw(chart) {
-    if (chart.canvas.id !== "chart-lbpDivTrend" || chart.config.type !== "doughnut") return;
+    if ((chart.canvas.id !== "chart-lbpDivTrend" && chart.canvas.id !== "chart-bsDonut") || chart.config.type !== "doughnut") return;
     const opt = (chart.options.plugins && chart.options.plugins.donutOutsideLabels) || {};
     if (!opt.enabled) return;
     const meta = chart.getDatasetMeta(0);
@@ -17043,6 +17437,7 @@ function resetAllData() {
   dimFilter.sales = "ALL"; dimFilter.kecamatan = "ALL"; dimFilter.kabupaten = "ALL";
   bsFilter.divisions = new Set(DIVISIONS); bsFilter.periode = new Set();
   bsDim.salesman = "ALL"; bsDim.reason = "ALL"; bsDim.outlet = "ALL";
+  bsChannelDrill.channel = null; bsChannelDrill.kodeOutlet = null;
   DB.ar = []; arFilter.divisions = new Set(DIVISIONS); arDetailOpen.top = null; arDetailOpen.overdue = null; arDim.salesman = "ALL"; arModeFilter.value = "";
   arSalesmanShowDetail.value = false;
   const arSalesmanDetailToggleReset = document.getElementById("arSalesmanShowDetailToggle"); if (arSalesmanDetailToggleReset) arSalesmanDetailToggleReset.checked = false;

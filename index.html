@@ -1715,6 +1715,14 @@
     letter-spacing:-.4px; margin-top:2px;
   }
   .exec-trend-slot .chart-canvas-wrap{height:340px !important;}
+  /* Nilai di atas kartu "Tren Omset" ribbon Omset (BUKAN salinan Home di
+     atas) -- class TERPISAH dari .exec-trend-total supaya ukurannya bisa
+     diperkecil (~30% lebih kecil dari 19px) tanpa ikut mengubah tampilan
+     salinan Home. Dipakai lintas tema krn cuma pakai var(--text). */
+  .lbp-trend-total-value{
+    font-size:13px !important; font-weight:900 !important; color:var(--text) !important;
+    letter-spacing:-.2px; margin-top:2px;
+  }
 
   /* --- 5 kartu komposisi: gaya profesional, grid 2 kolom rapi --- */
   #execStat5{
@@ -2818,6 +2826,8 @@
         <div class="titles">
           <h3>Tren Omset</h3>
           <div class="desc">Total Harga Bruto per Tanggal Faktur — pilih tampilan keseluruhan atau rincian per divisi</div>
+          <div class="desc lbp-trend-total-value" id="lbpDivTrendTotalValue">Rp 0</div>
+          <div class="desc" style="font-size:11px; opacity:.75;">Klik salah satu nama divisi di legend grafik untuk melihat total khusus divisi itu — klik lagi untuk kembali ke total keseluruhan</div>
         </div>
         <div class="tools">
           <select class="mode-select" id="lbpDivGroupSelect">
@@ -2827,6 +2837,7 @@
           </select>
           <select class="mode-select" data-mode-target="lbpDivTrend"><option value="hari">Per Hari</option><option value="minggu">Per Minggu</option><option value="bulan">Per Bulan</option></select>
           <label class="val-toggle"><input type="checkbox" data-values-target="lbpDivTrend"><span>🔢 Nilai</span></label>
+          <label class="val-toggle"><input type="checkbox" data-percent-target="lbpDivTrend" id="lbpDivTrendPercentToggle"><span>% Donat per Divisi</span></label>
         </div>
       </div>
       <div class="chart-canvas-wrap" style="height:380px;"><canvas id="chart-lbpDivTrend"></canvas></div>
@@ -3471,6 +3482,7 @@
               <option value="top20">Top 20 (Ringkasan)</option>
             </select>
             <label class="val-toggle"><input type="checkbox" data-values-target="lbpKecamatan"><span>🔢 Nilai</span></label>
+            <label class="val-toggle"><input type="checkbox" data-percent-target="lbpKecamatan"><span>% Omset</span></label>
           </div>
         </div>
         <div class="chart-canvas-wrap"><canvas id="chart-lbpKecamatan"></canvas></div>
@@ -3488,6 +3500,7 @@
               <option value="top20">Top 20 (Ringkasan)</option>
             </select>
             <label class="val-toggle"><input type="checkbox" data-values-target="lbpKabupaten"><span>🔢 Nilai</span></label>
+            <label class="val-toggle"><input type="checkbox" data-percent-target="lbpKabupaten"><span>% Omset</span></label>
           </div>
         </div>
         <div class="chart-canvas-wrap"><canvas id="chart-lbpKabupaten"></canvas></div>
@@ -3499,10 +3512,22 @@
 
     <div class="card chart-card" data-chart-id="lbpSalesman" data-chart-title="Ranking Salesman" style="margin-top:16px;">
       <div class="card-top">
-        <div class="titles"><h3>Ranking Omset per Salesman</h3><div class="desc">Seluruh Salesman, diurutkan dari omset tertinggi</div></div>
-        <div class="tools"><label class="val-toggle"><input type="checkbox" data-values-target="lbpSalesman"><span>🔢 Nilai</span></label></div>
+        <div class="titles"><h3>Ranking Omset per Salesman</h3><div class="desc">Seluruh Salesman, diurutkan dari omset tertinggi — klik salah satu bar untuk lihat rincian Salesman tersebut</div></div>
+        <div class="tools">
+          <label class="val-toggle"><input type="checkbox" data-values-target="lbpSalesman"><span>🔢 Nilai</span></label>
+          <label class="val-toggle"><input type="checkbox" data-percent-target="lbpSalesman"><span>% Omset</span></label>
+          <label class="val-toggle"><input type="checkbox" id="lbpSalesmanKartonToggle"><span>📦 Jumlah Karton</span></label>
+          <label class="val-toggle"><input type="checkbox" id="lbpSalesmanPctKartonToggle"><span>% Karton</span></label>
+        </div>
       </div>
       <div class="chart-canvas-wrap" style="height:520px;"><canvas id="chart-lbpSalesman"></canvas></div>
+      <div id="lbpSalesmanClickDetailBox" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid var(--line);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div id="lbpSalesmanClickDetailTitle" style="font-weight:800; font-size:14px;"></div>
+          <span class="chip" id="lbpSalesmanClickDetailClose">✕ Tutup</span>
+        </div>
+        <div class="grid grid-kpi" id="lbpSalesmanClickDetailKpi"></div>
+      </div>
       <label class="val-toggle detail-toggle-row"><input type="checkbox" data-detail-toggle="lbpSalesman"><span>📋 Tampilkan Detail</span></label>
       <div class="table-export-row" style="margin-top:8px;"><button class="table-export-btn" data-export-table="detailWrap_lbpSalesman" data-export-name="Detail_lbpSalesman">⬇️ Excel</button></div>
       <div class="generic-detail-wrap" id="detailWrap_lbpSalesman" style="display:none; margin-top:10px; max-height:380px; overflow:auto;"></div>
@@ -3527,6 +3552,9 @@
         </div>
       </div>
       <div class="presets" id="omsetWilayahDivisionList"></div>
+      <div class="filterbar" style="margin-top:10px;">
+        <div class="field" style="min-width:280px;"><label>🔍 Cari Kecamatan / Kabupaten (menyaring pilihan di 2 dropdown di bawah)</label><input type="text" id="omsetWilayahSearchInput" placeholder="Ketik nama Kecamatan atau Kabupaten/Kota..."></div>
+      </div>
       <div class="filterbar" style="margin-top:12px;">
         <div class="field" style="min-width:260px;"><label>Kecamatan</label><select class="mode-select" id="omsetWilayahKecamatanSelect"><option value="ALL">Pilih Kecamatan...</option></select></div>
         <div class="field" style="min-width:260px;"><label>Kabupaten / Kota</label><select class="mode-select" id="omsetWilayahKabupatenSelect"><option value="ALL">Pilih Kabupaten/Kota...</option></select></div>
@@ -5520,6 +5548,11 @@ const sendingFilter = { start: "", end: "", divisi: "ALL" };
 const sendingSalesmanFilter = { excluded: new Set() };
 const CHARTS = {};
 const showValues = {};
+/* chartId -> boolean: mode "% kontribusi" utk chart2 yang mendukungnya
+   (Omset per Kecamatan/Kabupaten, Ranking Salesman, Tren Omset). Dipakai
+   bersama valueLabelPlugin (supaya label angka di atas bar ikut ditandai
+   "%") dan dibaca langsung oleh masing2 fungsi render terkait. */
+const showPercent = {};
 const filter = { start: "", end: "", reasons: new Set(REASON_ORDER) };
 const inboundFilter = { divGroup: "4", divisi: "ALL", start: "", end: "" }; // divGroup "4"=BIS/CWC/MU245/M3, "3"=M1/MU245/M3
 /* Pencarian pada tabel "Detail per Pcode/Material" -- file Inbound tidak
@@ -5541,6 +5574,14 @@ const lbpDivTrend = { grouping: "all" };
 /* Instance mandiri untuk ribbon Home — default tampilan per Divisi (BIS/CWC/MU245/M3),
    terpisah dari instance di ribbon Omset (default "all") agar tidak saling mengganggu. */
 const lbpDivTrendHome = { grouping: "divisi" };
+/* Fokus legend klik pada kartu "Tren Omset" ribbon Omset (chartKey
+   "lbpDivTrend") SAJA -- TIDAK berlaku utk salinannya di Home, konsisten
+   dgn aturan mode donat di atas ("khusus kolom Tren Omset ribbon Omset").
+   field = "division" / "mainGroup" (grouping mode yg lagi aktif saat
+   diklik), key = nilai grup yg diisolasi (mis. "CWC"). Direset setiap kali
+   dropdown grouping (lbpDivGroupSelect) berganti, karena set grup yg
+   tersedia berubah (BIS/CWC/MU/M3 vs M1/M245/M3). */
+const lbpDivTrendLegendFocus = { field: null, key: null };
 /* State khusus modul WAREHOUSE (Bad Stock) — terpisah total dari filter Omset
    agar tidak saling mengganggu, sesuai permintaan. */
 const bsFilter = { divisions: new Set(DIVISIONS), periode: new Set() };
@@ -5762,6 +5803,11 @@ const valueLabelPlugin = {
   afterDatasetsDraw(chart) {
     const chartId = chart.canvas.id.replace("chart-", "");
     if (!showValues[chartId]) return;
+    // Donat (mis. Bad Stock, atau Tren Omset saat mode "% Donat" aktif) tidak
+    // pernah didesain utk overlay label -- tooltip donat sudah menampilkan
+    // Rp + % sendiri, dan posisi/isi label generik di sini tidak cocok utk
+    // elemen arc.
+    if (chart.config.type === "doughnut") return;
     const ctx = chart.ctx;
     const isHorizontal = chart.options.indexAxis === "y";
     ctx.save();
@@ -5775,7 +5821,10 @@ const valueLabelPlugin = {
         const raw = dataset.data[i];
         if (raw === null || raw === undefined) return;
         const pos = el.tooltipPosition ? el.tooltipPosition() : el;
-        const text = Math.abs(raw) >= 100 ? fmtInt(raw) : fmtNum(raw, Number.isInteger(raw) ? 0 : 1);
+        // Mode "% Omset" (raw sudah dalam bentuk angka persen) pakai
+        // omsetPctFmt() supaya kontribusi sangat kecil (<0,1%) tetap
+        // menampilkan 5 desimal, bukan dibulatkan jadi tampak 0,0%.
+        const text = showPercent[chartId] ? omsetPctFmt(raw) : (Math.abs(raw) >= 100 ? fmtInt(raw) : fmtNum(raw, Number.isInteger(raw) ? 0 : 1));
         if (isHorizontal) {
           ctx.textAlign = raw >= 0 ? "left" : "right";
           ctx.textBaseline = "middle";
@@ -7165,6 +7214,14 @@ function fCutCostAllAccounts() {
     (!ccFilter.start || r.date >= ccFilter.start) &&
     (!ccFilter.end || r.date <= ccFilter.end)
   );
+}
+/* "Total SELURUH biaya" utk periode (tanggal) yg sedang difilter --
+   dipakai sbg PENYEBUT %Nominal di Ringkasan Biaya (kartu 📋) & di kotak
+   TOTAL pada Detail Transaksi drill-down, SELALU thd keseluruhan biaya
+   (independen dari akun/fokus yg sedang dibuka, dan independen dari
+   Filter NOPOL/Teks pada drill-down) -- sesuai permintaan eksplisit. */
+function cutCostGrandTotalAll() {
+  return fCutCostAllAccounts().reduce((s, r) => s + r.amount, 0);
 }
 /* Detail transaksi SATU akun (dipilih dari ringkasan) -- diurutkan
    tanggal, siap ditampilkan drill-down. */
@@ -9740,6 +9797,32 @@ function lbpOrderDetailTableHtml(rows) {
     </table>`;
 }
 /* ---- Widget A: Ringkasan Wilayah (Kecamatan & Kabupaten/Kota) ---- */
+/* 4 kartu KPI: Total Karton, % Karton, Total Omset, % Omset -- persentase
+   dihitung dari total Karton/Omset wilayah tsb dibagi Total Karton/Omset
+   SELURUH data pada periode+filter Divisi widget ini yang sedang aktif
+   (baseKarton/baseOmset -- dihitung dari SELURUH baris "base", bukan cuma
+   yang mempunyai Kecamatan/Kabupaten). */
+function omsetKartonOmsetKpiHtml(label, karton, omset, baseKarton, baseOmset) {
+  const pctKarton = baseKarton ? (karton / baseKarton * 100) : 0;
+  const pctOmset = baseOmset ? (omset / baseOmset * 100) : 0;
+  return `
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico('box')}</div>
+      <div class="body"><div class="label">Total Isi Karton — ${label}</div><div class="value">${fmtNum(karton, 2)}</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico('box')}</div>
+      <div class="body"><div class="label">% Isi Karton — ${label}</div><div class="value">${omsetPctFmt(pctKarton)}</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico('money')}</div>
+      <div class="body"><div class="label">Total Omset (Harga Bruto) — ${label}</div><div class="value money">${fmtRp(omset)}</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico('money')}</div>
+      <div class="body"><div class="label">% Omset — ${label}</div><div class="value">${omsetPctFmt(pctOmset)}</div></div>
+    </div>`;
+}
 function renderOmsetWilayah() {
   const kecSel = document.getElementById("omsetWilayahKecamatanSelect");
   const kabSel = document.getElementById("omsetWilayahKabupatenSelect");
@@ -9747,6 +9830,8 @@ function renderOmsetWilayah() {
   const kabKpiWrap = document.getElementById("omsetWilayahKabKpi");
   if (!kecKpiWrap || !kabKpiWrap) return;
   const base = fLbpBase(omsetWilayahFilter.divisions);
+  const baseKarton = base.reduce((a, r) => a + (r.karton || 0), 0);
+  const baseOmset = lbpOmsetTotal(base);
   const kecVal = kecSel ? kecSel.value : "ALL";
   const kabVal = kabSel ? kabSel.value : "ALL";
   if (!kecVal || kecVal === "ALL") {
@@ -9754,32 +9839,16 @@ function renderOmsetWilayah() {
   } else {
     const rows = base.filter(r => r.kecamatan === kecVal);
     const karton = rows.reduce((a, r) => a + (r.karton || 0), 0);
-    const omset = rows.reduce((a, r) => a + r.omset, 0);
-    kecKpiWrap.innerHTML = `
-      <div class="card kpi-card">
-        <div class="icon-circle">${ico('box')}</div>
-        <div class="body"><div class="label">Total Isi Karton — Kec. ${kecVal}</div><div class="value">${fmtNum(karton, 2)}</div></div>
-      </div>
-      <div class="card kpi-card">
-        <div class="icon-circle">${ico('money')}</div>
-        <div class="body"><div class="label">Total Omset (Harga Bruto) — Kec. ${kecVal}</div><div class="value money">${fmtRp(omset)}</div></div>
-      </div>`;
+    const omset = lbpOmsetTotal(rows);
+    kecKpiWrap.innerHTML = omsetKartonOmsetKpiHtml(`Kec. ${kecVal}`, karton, omset, baseKarton, baseOmset);
   }
   if (!kabVal || kabVal === "ALL") {
     kabKpiWrap.innerHTML = `<div class="exec-empty" style="grid-column:1/-1;">Pilih Kabupaten/Kota di atas untuk melihat Total Isi Karton &amp; Total Omset-nya.</div>`;
   } else {
     const rows = base.filter(r => r.kabupaten === kabVal);
     const karton = rows.reduce((a, r) => a + (r.karton || 0), 0);
-    const omset = rows.reduce((a, r) => a + r.omset, 0);
-    kabKpiWrap.innerHTML = `
-      <div class="card kpi-card">
-        <div class="icon-circle">${ico('box')}</div>
-        <div class="body"><div class="label">Total Isi Karton — Kab./Kota ${kabVal}</div><div class="value">${fmtNum(karton, 2)}</div></div>
-      </div>
-      <div class="card kpi-card">
-        <div class="icon-circle">${ico('money')}</div>
-        <div class="body"><div class="label">Total Omset (Harga Bruto) — Kab./Kota ${kabVal}</div><div class="value money">${fmtRp(omset)}</div></div>
-      </div>`;
+    const omset = lbpOmsetTotal(rows);
+    kabKpiWrap.innerHTML = omsetKartonOmsetKpiHtml(`Kab./Kota ${kabVal}`, karton, omset, baseKarton, baseOmset);
   }
 }
 function buildOmsetWilayahDropdowns() {
@@ -9799,6 +9868,27 @@ function buildOmsetWilayahDropdowns() {
   };
   mk(kecSel, kecSet, "Pilih Kecamatan...");
   mk(kabSel, kabSet, "Pilih Kabupaten/Kota...");
+  // Kalau ada kata kunci pencarian yang masih aktif (mis. baru selesai upload
+  // file lain, dropdown dibangun ulang dari nol) -- terapkan lagi supaya
+  // penyaringannya tidak hilang begitu saja.
+  applyOmsetWilayahSearch();
+}
+/* Kotak pencarian "🔍 Cari Kecamatan/Kabupaten" -- TIDAK mengganti dropdown
+   dgn komponen lain (menu <select> aslinya, lengkap dgn scroll-nya, tetap
+   ada persis seperti semula), hanya menyembunyikan <option> yang namanya
+   tidak cocok dgn kata kunci di KEDUA dropdown sekaligus, supaya user tidak
+   perlu scroll panjang mencari 1 nama di antara puluhan kecamatan/kabupaten.
+   Opsi "ALL" (placeholder) selalu tetap terlihat. */
+function applyOmsetWilayahSearch() {
+  const input = document.getElementById("omsetWilayahSearchInput");
+  const q = input ? input.value.trim().toLowerCase() : "";
+  [document.getElementById("omsetWilayahKecamatanSelect"), document.getElementById("omsetWilayahKabupatenSelect")].forEach(sel => {
+    if (!sel) return;
+    Array.from(sel.options).forEach(opt => {
+      if (opt.value === "ALL") { opt.hidden = false; return; }
+      opt.hidden = q.length > 0 && !opt.textContent.toLowerCase().includes(q);
+    });
+  });
 }
 /* ---- Widget B: Cari Toko / Pcode ---- */
 function omsetSearchResults() {
@@ -9852,15 +9942,13 @@ function renderOmsetSearch() {
     } else {
       const totalOmset = allResults.reduce((a, r) => a + r.omset, 0);
       const totalKarton = allResults.reduce((a, r) => a + (r.karton || 0), 0);
-      kpiWrap.innerHTML = `
-        <div class="card kpi-card">
-          <div class="icon-circle">${ico('money')}</div>
-          <div class="body"><div class="label">Total Omset (Harga Bruto) — "${q}"</div><div class="value money">${fmtRp(totalOmset)}</div></div>
-        </div>
-        <div class="card kpi-card">
-          <div class="icon-circle">${ico('box')}</div>
-          <div class="body"><div class="label">Total Isi Karton — "${q}"</div><div class="value">${fmtNum(totalKarton, 2)}</div></div>
-        </div>`;
+      // Basis % = SELURUH data pada periode+filter Divisi widget "Cari Toko/
+      // Pcode" ini (bukan cuma hasil pencarian) -- konsisten dgn widget
+      // Ringkasan Wilayah.
+      const baseAll = fLbpBase(omsetSearchFilter.divisions);
+      const baseKarton = baseAll.reduce((a, r) => a + (r.karton || 0), 0);
+      const baseOmset = lbpOmsetTotal(baseAll);
+      kpiWrap.innerHTML = omsetKartonOmsetKpiHtml(`"${q}"`, totalKarton, totalOmset, baseKarton, baseOmset);
     }
   }
   wrap.innerHTML = lbpOrderDetailTableHtml(rows);
@@ -9910,12 +9998,21 @@ function renderOmsetChannel() {
     const k = r.outletCode || r.outletName;
     if (k) grandTokoSet.add(k);
   });
+  // % tiap Channel = metrik Channel itu dibagi Grand Total kolom yang sama.
+  // CATATAN utk % Jumlah Toko: karena 1 toko bisa order di lebih dari 1
+  // Channel, menjumlah % Jumlah Toko SELURUH baris bisa melebihi 100% --
+  // ini wajar/diharapkan (sama seperti Jumlah Toko sendiri yang juga tidak
+  // aditif), BEDA dgn % Karton/% Omset yang aditif dan akan pas 100%.
+  const grandToko = grandTokoSet.size;
   wrap.innerHTML = `
     <table class="ar-table">
       <thead><tr>
         <th>No</th><th>Channel</th><th style="text-align:right;">Jumlah Toko</th>
+        <th style="text-align:right;">% Jumlah Toko</th>
         <th style="text-align:right;">Total Isi Karton</th>
-        <th style="text-align:right;">Total Omset (Harga Bruto)</th><th></th>
+        <th style="text-align:right;">% Total Isi Karton</th>
+        <th style="text-align:right;">Total Omset (Harga Bruto)</th>
+        <th style="text-align:right;">% Total Omset</th><th></th>
       </tr></thead>
       <tbody>
         ${summary.map((s, i) => `
@@ -9923,17 +10020,23 @@ function renderOmsetChannel() {
             <td>${i + 1}</td>
             <td>${s.channel}${s.omset === maxOmset ? ' <span style="color:var(--c-green); font-weight:700; font-size:10px; border:1px solid var(--c-green); padding:1px 6px; border-radius:6px; margin-left:6px;">TERBESAR</span>' : ""}${(s.omset === minOmset && summary.length > 1) ? ' <span style="color:var(--c-red); font-weight:700; font-size:10px; border:1px solid var(--c-red); padding:1px 6px; border-radius:6px; margin-left:6px;">TERKECIL</span>' : ""}</td>
             <td style="text-align:right;">${fmtInt(s.tokoCount)}</td>
+            <td style="text-align:right;">${omsetPctFmt(grandToko ? s.tokoCount / grandToko * 100 : 0)}</td>
             <td style="text-align:right;">${fmtNum(s.karton, 2)}</td>
+            <td style="text-align:right;">${omsetPctFmt(grandKarton ? s.karton / grandKarton * 100 : 0)}</td>
             <td style="text-align:right;">${fmtRp(s.omset)}</td>
+            <td style="text-align:right;">${omsetPctFmt(grandOmset ? s.omset / grandOmset * 100 : 0)}</td>
             <td style="text-align:right; color:var(--accent); font-weight:700; white-space:nowrap;">Lihat detail ›</td>
           </tr>`).join("")}
       </tbody>
       <tfoot>
         <tr style="font-weight:800; border-top:2px solid var(--line);">
           <td colspan="2">GRAND TOTAL — ${fmtInt(summary.length)} Channel</td>
-          <td style="text-align:right;">${fmtInt(grandTokoSet.size)}</td>
+          <td style="text-align:right;">${fmtInt(grandToko)}</td>
+          <td style="text-align:right;">${omsetPctFmt(grandToko ? 100 : 0)}</td>
           <td style="text-align:right;">${fmtNum(grandKarton, 2)}</td>
+          <td style="text-align:right;">${omsetPctFmt(grandKarton ? 100 : 0)}</td>
           <td style="text-align:right;">${fmtRp(grandOmset)}</td>
+          <td style="text-align:right;">${omsetPctFmt(grandOmset ? 100 : 0)}</td>
           <td></td>
         </tr>
       </tfoot>
@@ -10012,6 +10115,7 @@ function buildOmsetDetailFilterUI() {
   });
 }
 function lbpOmsetTotal(rows) { return rows.reduce((a, r) => a + r.omset, 0); }
+function lbpKartonTotal(rows) { return rows.reduce((a, r) => a + (r.karton || 0), 0); }
 function lbpCountDistinct(rows, field) { return new Set(rows.map(r => r[field]).filter(Boolean)).size; }
 function lbpByPeriod(rows, mode) {
   const keyFn = mode === "hari" ? (d => d) : mode === "minggu" ? mondayOf : monthKey;
@@ -11216,16 +11320,45 @@ function renderDimBarChart(chartKey, canvasId, entries, formatFn, colorArr) {
   });
 }
 
+/* Format % kontribusi khusus fitur Omset (Kecamatan/Kabupaten/Salesman/
+   Tren Omset donat/Ringkasan Wilayah/Cari Toko/Channel) -- >=0,1% wajib 2
+   desimal (permintaan terbaru, sebelumnya 1 desimal), tapi KHUSUS < 0,1%
+   (termasuk 0) dipakai 5 desimal supaya kontribusi yang sangat kecil tetap
+   terlihat angkanya (mis. 0,03421%), tidak "hilang" dibulatkan jadi
+   terlihat 0,00% padahal sebenarnya ada nilainya. Berlaku utk SELURUH
+   pemakaian omsetPctFmt di ribbon Omset (satu fungsi dipakai bersama). */
+function omsetPctFmt(n) {
+  const v = Number(n) || 0;
+  return (Math.abs(v) < 0.1 ? fmtNum(v, 5) : fmtNum(v, 2)) + "%";
+}
+/* Helper bersama utk chart bar horizontal Omset (Kecamatan/Kabupaten/
+   Salesman) yang mendukung toggle "% Omset" -- saat aktif, nilai bar diubah
+   dari Rp menjadi % kontribusi thd Total Omset periode yang sedang
+   difilter (total dihitung dari SELURUH baris hasil filter, BUKAN cuma
+   Top 10/20 yang tampil di chart), dan sumbu x + tooltip ikut diformat %. */
+function pctAwareBarOptions(chartId, total) {
+  const isPct = !!showPercent[chartId];
+  return {
+    isPct,
+    valueOf: (raw) => isPct ? (total ? (raw / total * 100) : 0) : raw,
+    tooltipLabel: (ctx) => isPct ? omsetPctFmt(ctx.parsed.x) : fmtRp(ctx.parsed.x),
+    xScale: isPct
+      ? { x: { ticks: { font: { size: 10 }, color: textColor(), padding: 4, callback: v => fmtNum(v, 0) + "%" }, grid: { display: false } } }
+      : {}
+  };
+}
 /* ---- LBP: Omset per Kecamatan (Top10/Bottom10/Top20) ---- */
 function renderLbpKecamatan() {
   const rows = fLbp();
   const entries = lbpRanked(rows, "kecamatan", rankMode.kecamatan);
   if (ensureEmptyState("chart-lbpKecamatan", entries.length === 0)) return;
   destroyChart("lbpKecamatan");
+  const total = lbpOmsetTotal(rows);
+  const P = pctAwareBarOptions("lbpKecamatan", total);
   CHARTS.lbpKecamatan = new Chart(document.getElementById("chart-lbpKecamatan"), {
     type: "bar",
-    data: { labels: entries.map(e => e[0]), datasets: [{ label: "Omset", data: entries.map(e => e[1]), backgroundColor: CV("--accent") }] },
-    options: styledOpts({ indexAxis: "y", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => fmtRp(ctx.parsed.x) } } } })
+    data: { labels: entries.map(e => e[0]), datasets: [{ label: P.isPct ? "% Omset" : "Omset", data: entries.map(e => P.valueOf(e[1])), backgroundColor: CV("--accent") }] },
+    options: styledOpts({ indexAxis: "y", plugins: { legend: { display: false }, tooltip: { callbacks: { label: P.tooltipLabel } } }, scales: P.xScale })
   });
 }
 /* ---- LBP: Omset per Kabupaten (Top10/Bottom10/Top20) ---- */
@@ -11234,25 +11367,120 @@ function renderLbpKabupaten() {
   const entries = lbpRanked(rows, "kabupaten", rankMode.kabupaten);
   if (ensureEmptyState("chart-lbpKabupaten", entries.length === 0)) return;
   destroyChart("lbpKabupaten");
+  const total = lbpOmsetTotal(rows);
+  const P = pctAwareBarOptions("lbpKabupaten", total);
   CHARTS.lbpKabupaten = new Chart(document.getElementById("chart-lbpKabupaten"), {
     type: "bar",
-    data: { labels: entries.map(e => e[0]), datasets: [{ label: "Omset", data: entries.map(e => e[1]), backgroundColor: SEM.green }] },
-    options: styledOpts({ indexAxis: "y", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => fmtRp(ctx.parsed.x) } } } })
+    data: { labels: entries.map(e => e[0]), datasets: [{ label: P.isPct ? "% Omset" : "Omset", data: entries.map(e => P.valueOf(e[1])), backgroundColor: SEM.green }] },
+    options: styledOpts({ indexAxis: "y", plugins: { legend: { display: false }, tooltip: { callbacks: { label: P.tooltipLabel } } }, scales: P.xScale })
   });
 }
 /* ---- LBP: Ranking Salesman ---- */
+/* State checklist "📦 Jumlah Karton" / "% Karton" KHUSUS Ranking Salesman --
+   independen (secara penyimpanan) dari showPercent.lbpSalesman ("% Omset")
+   yang sudah ada, tapi SALING EKSKLUSIF secara UI (lihat wiring di init()):
+   menyalakan salah satu checklist metrik akan mematikan checklist metrik
+   lainnya, supaya tidak ambigu bar-nya sedang menampilkan metrik yang mana.
+   Prioritas render (jaga-jaga kalau tetap ada 2 yg aktif bersamaan): %Karton
+   > Jumlah Karton > %Omset > Omset (nilai Rp, default). */
+const lbpSalesmanKartonMode = { karton: false, pctKarton: false };
+/* Salesman yang barnya terakhir diklik di chart Ranking Salesman --
+   dipertahankan di sini (bukan cuma variabel lokal) supaya kotak detail di
+   bawah chart ikut ter-refresh otomatis setiap renderLbpSalesman() dipanggil
+   ulang (mis. filter tanggal/divisi berubah), sama seperti pola detail klik
+   Channel di widget Omset lainnya. */
+const lbpSalesmanClickDetail = { salesman: null };
 function renderLbpSalesman() {
   const rows = fLbp();
   const map = new Map();
-  rows.forEach(r => { if (!r.salesman) return; map.set(r.salesman, (map.get(r.salesman) || 0) + r.omset); });
-  const entries = Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
-  if (ensureEmptyState("chart-lbpSalesman", entries.length === 0)) return;
+  rows.forEach(r => {
+    if (!r.salesman) return;
+    if (!map.has(r.salesman)) map.set(r.salesman, { omset: 0, karton: 0 });
+    const o = map.get(r.salesman);
+    o.omset += r.omset;
+    o.karton += (r.karton || 0);
+  });
+  // Urutan ranking SELALU berdasarkan Omset (default), supaya tetap
+  // konsisten & tidak membingungkan walau metrik yang DITAMPILKAN sedang
+  // Karton/%Karton.
+  const entries = Array.from(map.entries()).sort((a, b) => b[1].omset - a[1].omset);
+  if (ensureEmptyState("chart-lbpSalesman", entries.length === 0)) { renderLbpSalesmanClickDetail(); return; }
   destroyChart("lbpSalesman");
+  const totalOmset = lbpOmsetTotal(rows);
+  const totalKarton = lbpKartonTotal(rows);
+  const usePctKarton = lbpSalesmanKartonMode.pctKarton;
+  const useKarton = lbpSalesmanKartonMode.karton;
+  const usePctOmset = !usePctKarton && !useKarton && showPercent.lbpSalesman;
+  let metricLabel, values, tooltipLabel;
+  if (usePctKarton) {
+    metricLabel = "% Isi Karton";
+    values = entries.map(([, v]) => totalKarton ? (v.karton / totalKarton * 100) : 0);
+    tooltipLabel = (ctx) => omsetPctFmt(ctx.parsed.x);
+  } else if (useKarton) {
+    metricLabel = "Isi Karton";
+    values = entries.map(([, v]) => v.karton);
+    tooltipLabel = (ctx) => fmtNum(ctx.parsed.x, 2);
+  } else if (usePctOmset) {
+    metricLabel = "% Omset";
+    values = entries.map(([, v]) => totalOmset ? (v.omset / totalOmset * 100) : 0);
+    tooltipLabel = (ctx) => omsetPctFmt(ctx.parsed.x);
+  } else {
+    metricLabel = "Omset";
+    values = entries.map(([, v]) => v.omset);
+    tooltipLabel = (ctx) => fmtRp(ctx.parsed.x);
+  }
+  // showPercent.lbpSalesman dipakai bersama oleh valueLabelPlugin (overlay
+  // label "🔢 Nilai") supaya tahu kapan harus format sbg % (dgn 5 desimal
+  // utk <0,1%) -- true kalau SALAH SATU dari 2 mode % (Omset/Karton) aktif.
+  showPercent.lbpSalesman = usePctOmset || usePctKarton;
+  const isPctMode = usePctOmset || usePctKarton;
   CHARTS.lbpSalesman = new Chart(document.getElementById("chart-lbpSalesman"), {
     type: "bar",
-    data: { labels: entries.map(e => e[0]), datasets: [{ label: "Omset", data: entries.map(e => e[1]), backgroundColor: BARS }] },
-    options: styledOpts({ indexAxis: "y", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => fmtRp(ctx.parsed.x) } } } })
+    data: { labels: entries.map(e => e[0]), datasets: [{ label: metricLabel, data: values, backgroundColor: BARS }] },
+    options: styledOpts({
+      indexAxis: "y",
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: tooltipLabel } } },
+      scales: isPctMode ? { x: { ticks: { font: { size: 10 }, color: textColor(), padding: 4, callback: v => fmtNum(v, 0) + "%" }, grid: { display: false } } } : {},
+      onClick: (evt, elements) => {
+        if (!elements.length) return;
+        const idx = elements[0].index;
+        const picked = entries[idx];
+        if (!picked) return;
+        lbpSalesmanClickDetail.salesman = picked[0];
+        renderLbpSalesmanClickDetail();
+      }
+    })
   });
+  renderLbpSalesmanClickDetail();
+}
+/* Kotak detail di bawah chart Ranking Salesman -- muncul setelah salah satu
+   bar diklik, isinya 4 KPI (pakai helper yg sama dgn widget Ringkasan
+   Wilayah/Cari Toko): Total Karton, % Karton, Total Omset, % Omset -- semua
+   % dihitung thd TOTAL KESELURUHAN (fLbp(), bukan cuma salesman itu). */
+function renderLbpSalesmanClickDetail() {
+  const box = document.getElementById("lbpSalesmanClickDetailBox");
+  if (!box) return;
+  const salesman = lbpSalesmanClickDetail.salesman;
+  if (!salesman) { box.style.display = "none"; return; }
+  const rows = fLbp();
+  const rowsForSalesman = rows.filter(r => r.salesman === salesman);
+  if (!rowsForSalesman.length) {
+    // Salesman yg dulu dipilih sudah tidak ada lagi di data terfilter saat
+    // ini (mis. filter tanggal/divisi berubah) -- tutup kotaknya otomatis
+    // drpd menampilkan angka nol yg membingungkan.
+    lbpSalesmanClickDetail.salesman = null;
+    box.style.display = "none";
+    return;
+  }
+  const omset = lbpOmsetTotal(rowsForSalesman);
+  const karton = lbpKartonTotal(rowsForSalesman);
+  const totalOmset = lbpOmsetTotal(rows);
+  const totalKarton = lbpKartonTotal(rows);
+  box.style.display = "";
+  const titleEl = document.getElementById("lbpSalesmanClickDetailTitle");
+  if (titleEl) titleEl.textContent = `Detail Salesman: ${salesman}`;
+  const kpiWrap = document.getElementById("lbpSalesmanClickDetailKpi");
+  if (kpiWrap) kpiWrap.innerHTML = omsetKartonOmsetKpiHtml(salesman, karton, omset, totalKarton, totalOmset);
 }
 
 /* =========================================================================
@@ -11750,8 +11978,22 @@ function renderCutCostDetailTable() {
 function buildCcAccountFilterUI() {
   const sel = document.getElementById("filterCcAccount");
   if (!sel) return;
+  // SEMUA kode akun yg BENAR-BENAR ada di file yg diupload (bukan cuma 7
+  // kode "dikenal" bawaan CC_ACCOUNT_ORDER) -- sesuai permintaan "saya
+  // ingin semua akun ada didalamnya". Diambil dari SELURUH DB.cutCost
+  // (tanpa ikut filter tanggal), supaya daftar pilihan tidak berubah-ubah
+  // hilang/muncul cuma krn filter periode digeser. Urutan: kategori Biaya
+  // Fokus dulu (sama seperti Ringkasan Biaya), baru alfabet.
+  const uniqueAccounts = [...new Set(DB.cutCost.map(r => r.account))].sort((a, b) => {
+    const fa = CC_FOCUS_ORDER.indexOf(ccFocusOf(a)), fb = CC_FOCUS_ORDER.indexOf(ccFocusOf(b));
+    return (fa < 0 ? 999 : fa) - (fb < 0 ? 999 : fb) || a.localeCompare(b);
+  });
   sel.innerHTML = '<option value="ALL">Semua Akun</option>' +
-    CC_ACCOUNT_ORDER.map(a => `<option value="${a}">${a} — ${CC_ACCOUNTS[a]}</option>`).join("");
+    uniqueAccounts.map(a => `<option value="${a}">${a} — ${ccAccountNameOf(a)}</option>`).join("");
+  // Kalau akun yg sebelumnya dipilih ternyata sudah tidak ada lagi di data
+  // (mis. upload file baru dgn kode berbeda), kembali ke "Semua Akun"
+  // drpd diam-diam menampilkan dropdown kosong/tidak sinkron.
+  if (ccFilter.account !== "ALL" && !uniqueAccounts.includes(ccFilter.account)) ccFilter.account = "ALL";
   sel.value = ccFilter.account;
 }
 /* Kartu Ringkasan GL Akun -- No, GL Akun, Nama, Jumlah Transaksi, Total
@@ -11768,20 +12010,39 @@ function renderCcAccountSummary() {
   if (!wrap) return;
   if (ccViewMode.mode === "focus") {
     const list = cutCostFocusSummary();
+    // %Nominal per baris = Total Nominal baris itu dibagi TOTAL SELURUH
+    // biaya (grandNominal, dijumlah dari list ini sendiri -- krn list ini
+    // sudah mencakup 100% baris fCutCostAllAccounts(), hasilnya identik dgn
+    // cutCostGrandTotalAll() tapi tanpa hitung ulang dari nol).
+    const grandKodeGl = list.reduce((a, o) => a + o.jumlahKodeGl, 0);
+    const grandTransaksi = list.reduce((a, o) => a + o.jumlahTransaksi, 0);
+    const grandNominal = list.reduce((a, o) => a + o.totalNominal, 0);
     wrap.innerHTML = `
       <table class="ar-table prestasi-table">
         <thead><tr>
           <th>No</th><th>Biaya Fokus</th><th style="text-align:right;">Jumlah Kode GL</th>
-          <th style="text-align:right;">Jumlah Transaksi</th><th style="text-align:right;">Total Nominal</th><th>Detail</th>
+          <th style="text-align:right;">Jumlah Transaksi</th><th style="text-align:right;">Total Nominal</th>
+          <th style="text-align:right;">% Nominal</th><th>Detail</th>
         </tr></thead>
         <tbody>
           ${list.map((o, i) => `<tr${ccDrilldown.focus === o.focus ? ' style="background:var(--accent-soft);"' : ''}>
             <td>${i + 1}</td><td><span class="chip" style="background:${CC_FOCUS_COLORS[o.focus]}22; border:1px solid ${CC_FOCUS_COLORS[o.focus]}; color:${CC_FOCUS_COLORS[o.focus]}; font-weight:700;">${o.focus}</span></td>
             <td style="text-align:right;">${fmtInt(o.jumlahKodeGl)}</td>
             <td style="text-align:right;">${fmtInt(o.jumlahTransaksi)}</td><td style="text-align:right;">${fmtRp(o.totalNominal)}</td>
+            <td style="text-align:right;">${omsetPctFmt(grandNominal ? o.totalNominal / grandNominal * 100 : 0)}</td>
             <td><button class="btn btn-ghost btn-sm cc-detail-btn" data-focus="${o.focus}" style="padding:4px 10px; font-size:11px;">${ccDrilldown.focus === o.focus ? '✓ Terbuka' : '🔍 Detail'}</button></td>
           </tr>`).join("")}
         </tbody>
+        <tfoot>
+          <tr style="font-weight:800; border-top:2px solid var(--line);">
+            <td colspan="2">GRAND TOTAL — ${fmtInt(list.length)} Biaya Fokus</td>
+            <td style="text-align:right;">${fmtInt(grandKodeGl)}</td>
+            <td style="text-align:right;">${fmtInt(grandTransaksi)}</td>
+            <td style="text-align:right;">${fmtRp(grandNominal)}</td>
+            <td style="text-align:right;">${omsetPctFmt(grandNominal ? 100 : 0)}</td>
+            <td></td>
+          </tr>
+        </tfoot>
       </table>`;
     wrap.querySelectorAll(".cc-detail-btn").forEach(btn => {
       btn.addEventListener("click", () => {
@@ -11795,20 +12056,34 @@ function renderCcAccountSummary() {
     return;
   }
   const list = cutCostAccountSummary();
+  const grandTransaksiAcc = list.reduce((a, o) => a + o.jumlahTransaksi, 0);
+  const grandNominalAcc = list.reduce((a, o) => a + o.totalNominal, 0);
   wrap.innerHTML = `
     <table class="ar-table prestasi-table">
       <thead><tr>
         <th>No</th><th>GL Akun</th><th>Account Name</th><th>Biaya Fokus</th>
-        <th style="text-align:right;">Jumlah Transaksi</th><th style="text-align:right;">Total Nominal</th><th>Detail</th>
+        <th style="text-align:right;">Jumlah Transaksi</th><th style="text-align:right;">Total Nominal</th>
+        <th style="text-align:right;">% Nominal</th><th>Detail</th>
       </tr></thead>
       <tbody>
         ${list.map((o, i) => `<tr${ccDrilldown.account === o.account ? ' style="background:var(--accent-soft);"' : ''}>
           <td>${i + 1}</td><td>${o.account}</td><td>${o.accountName}</td>
           <td><span class="chip" style="background:${CC_FOCUS_COLORS[o.focus]}22; border:1px solid ${CC_FOCUS_COLORS[o.focus]}; color:${CC_FOCUS_COLORS[o.focus]}; font-weight:700; font-size:10px;">${o.focus}</span></td>
           <td style="text-align:right;">${fmtInt(o.jumlahTransaksi)}</td><td style="text-align:right;">${fmtRp(o.totalNominal)}</td>
+          <td style="text-align:right;">${omsetPctFmt(grandNominalAcc ? o.totalNominal / grandNominalAcc * 100 : 0)}</td>
           <td><button class="btn btn-ghost btn-sm cc-detail-btn" data-account="${o.account}" style="padding:4px 10px; font-size:11px;">${ccDrilldown.account === o.account ? '✓ Terbuka' : '🔍 Detail'}</button></td>
         </tr>`).join("")}
       </tbody>
+      <tfoot>
+        <tr style="font-weight:800; border-top:2px solid var(--line);">
+          <td colspan="3">GRAND TOTAL — ${fmtInt(list.length)} Kode GL</td>
+          <td></td>
+          <td style="text-align:right;">${fmtInt(grandTransaksiAcc)}</td>
+          <td style="text-align:right;">${fmtRp(grandNominalAcc)}</td>
+          <td style="text-align:right;">${omsetPctFmt(grandNominalAcc ? 100 : 0)}</td>
+          <td></td>
+        </tr>
+      </tfoot>
     </table>`;
   wrap.querySelectorAll(".cc-detail-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -11928,9 +12203,14 @@ function renderCcDrilldownResults() {
           return { list, totalTransaksi: rows.length, totalNominal: rows.reduce((s, r) => s + r.amount, 0), hariTerbanyak: list.length ? list.slice().sort((a, b) => b.jumlahTransaksi - a.jumlahTransaksi)[0] : null };
         })()
       : cutCostNopolFrequency(ccDrilldown.account, ccDrilldown.nopol);
+    // %Nominal SELALU thd "Total SELURUH biaya" periode yg difilter
+    // (cutCostGrandTotalAll()) -- BUKAN thd total akun/fokus yg sedang
+    // dibuka, dan TIDAK ikut berubah basisnya walau lagi difilter
+    // NOPOL/Teks (sesuai permintaan eksplisit "ingat dari total biaya").
+    const grandAll1 = cutCostGrandTotalAll();
     wrap.innerHTML = `
       <div style="font-size:12px; color:var(--sub); font-weight:700; margin-bottom:8px;">
-        ${ccDrilldown.nopol} — ${fmtInt(freq.totalTransaksi)} transaksi, total ${fmtRp(freq.totalNominal)}
+        ${ccDrilldown.nopol} — ${fmtInt(freq.totalTransaksi)} transaksi, total ${fmtRp(freq.totalNominal)} (${omsetPctFmt(grandAll1 ? freq.totalNominal / grandAll1 * 100 : 0)} dari total biaya)
         ${freq.hariTerbanyak ? ` · Hari terbanyak: ${fmtDateID(freq.hariTerbanyak.date)} (${fmtInt(freq.hariTerbanyak.jumlahTransaksi)}x)` : ""}
       </div>
       <table class="ar-table prestasi-table">
@@ -11950,9 +12230,14 @@ function renderCcDrilldownResults() {
     : baseRows;
   const total = rows.reduce((s, r) => s + r.amount, 0);
   const freqSummary = textQuery ? cutCostTextFrequency(baseRows, textQuery) : null;
+  // %Nominal kotak TOTAL paling bawah -- SELALU thd "Total SELURUH biaya"
+  // (cutCostGrandTotalAll()), TIDAK ikut ter-reset ke basis akun/fokus atau
+  // basis hasil Filter Teks itu sendiri, biar angka & persentase-nya tetap
+  // "nyambung" ke gambaran besar walau tabelnya sedang difilter/dipersempit.
+  const grandAll2 = cutCostGrandTotalAll();
   wrap.innerHTML = `
     ${freqSummary ? `<div style="font-size:12px; color:var(--sub); font-weight:700; margin-bottom:8px;">
-      Filter Teks "${textQuery}" — ${fmtInt(freqSummary.totalTransaksi)} transaksi, total ${fmtRp(freqSummary.totalNominal)}
+      Filter Teks "${textQuery}" — ${fmtInt(freqSummary.totalTransaksi)} transaksi, total ${fmtRp(freqSummary.totalNominal)} (${omsetPctFmt(grandAll2 ? freqSummary.totalNominal / grandAll2 * 100 : 0)} dari total biaya)
       ${freqSummary.hariTerbanyak ? ` · Hari terbanyak: ${fmtDateID(freqSummary.hariTerbanyak.date)} (${fmtInt(freqSummary.hariTerbanyak.jumlahTransaksi)}x)` : ""}
     </div>` : ""}
     <table class="ar-table prestasi-table">
@@ -11966,7 +12251,8 @@ function renderCcDrilldownResults() {
       </tbody>
       <tfoot>
         <tr style="font-weight:800; border-top:2px solid var(--line);">
-          <td colspan="${2 + (punyaNopol ? 1 : 0) + (isFocusMode ? 1 : 0)}">TOTAL — ${fmtInt(rows.length)} transaksi</td><td></td><td style="text-align:right;">${fmtRp(total)}</td>
+          <td colspan="${2 + (punyaNopol ? 1 : 0) + (isFocusMode ? 1 : 0)}">TOTAL — ${fmtInt(rows.length)} transaksi</td><td></td>
+          <td style="text-align:right;">${fmtRp(total)} <span style="font-weight:700; opacity:.85;">(${omsetPctFmt(grandAll2 ? total / grandAll2 * 100 : 0)})</span></td>
         </tr>
       </tfoot>
     </table>`;
@@ -14436,10 +14722,40 @@ if (typeof Chart !== "undefined") Chart.register(bsGlowPlugin);
    - "all"    : Total Omset keseluruhan (batang, warna aksen tema)
    - "utama"  : M1 (merah), M245 (hijau), M3 (biru)
    - "divisi" : BIS (merah), CWC (kuning), MU (hijau), M3 (biru) */
+/* Update teks nilai di atas chart "Tren Omset" ribbon Omset (di bawah judul
+   kartu) -- default menampilkan Total Omset SELURUH grup/divisi pada
+   periode+filter aktif; kalau ada satu divisi/grup yang sedang diisolasi
+   lewat klik legend (lihat onClick di bawah), berubah menampilkan total
+   KHUSUS grup itu saja beserta % kontribusinya thd total keseluruhan. TIDAK
+   dipanggil utk salinan Home (lbpDivTrendHome tidak punya elemen ini). */
+function updateLbpDivTrendTotalValue(rows, field, total) {
+  const el = document.getElementById("lbpDivTrendTotalValue");
+  if (!el) return;
+  const focusKey = (field && lbpDivTrendLegendFocus.field === field) ? lbpDivTrendLegendFocus.key : null;
+  // SESUAI PERMINTAAN: cukup angkanya saja, TANPA teks label ("Total Omset
+  // (Seluruh Divisi/Grup):" / "Total Omset — CWC:" dst dihilangkan) -- saat
+  // tidak ada divisi yg diisolasi, cukup Rp total keseluruhan; saat ada yg
+  // diisolasi (klik legend), tampilkan Rp total khusus grup itu lalu %
+  // kontribusinya, urutannya: angka dulu baru persentase.
+  if (!focusKey) {
+    el.textContent = fmtRp(total);
+  } else {
+    const groupTotal = rows.reduce((a, r) => a + (r[field] === focusKey ? r.omset : 0), 0);
+    const pct = total ? (groupTotal / total * 100) : 0;
+    el.textContent = `${fmtRp(groupTotal)} (${omsetPctFmt(pct)})`;
+  }
+}
 function renderLbpDivTrendGeneric(canvasId, chartKey, mode, periodMode) {
   const rows = fLbp();
+  // Nilai di atas chart (isolate-per-divisi via klik legend) HANYA utk kartu
+  // ribbon Omset (chartKey "lbpDivTrend"), BUKAN salinan Home.
+  const isRibbonOmset = chartKey === "lbpDivTrend";
+  const total = lbpOmsetTotal(rows);
 
   if (mode === "all") {
+    // Mode "Omset All" cuma 1 seri (tanpa legend per-divisi) -- tidak ada apa
+    // pun yang bisa diisolasi, jadi selalu tampilkan total keseluruhan.
+    if (isRibbonOmset) updateLbpDivTrendTotalValue(rows, null, total);
     const p = lbpByPeriod(rows, periodMode);
     if (ensureEmptyState(canvasId, p.labels.length === 0)) return;
     destroyChart(chartKey);
@@ -14465,18 +14781,219 @@ function renderLbpDivTrendGeneric(canvasId, chartKey, mode, periodMode) {
   const t = lbpTrendByGroup(rows, periodMode, field, groups);
   if (ensureEmptyState(canvasId, t.labels.length === 0)) return;
   destroyChart(chartKey);
+  // Kalau ada fokus isolate yg tersimpan utk field grouping yg SAMA (mis.
+  // masih "division" & masih "CWC"), pertahankan visibilitas dataset yg
+  // sesuai supaya tetap konsisten setelah re-render (ganti filter tanggal/
+  // divisi dsb) -- sama seperti pola kotak detail klik Salesman.
+  const activeFocusKey = (isRibbonOmset && lbpDivTrendLegendFocus.field === field) ? lbpDivTrendLegendFocus.key : null;
   CHARTS[chartKey] = new Chart(document.getElementById(canvasId), {
     type: "line",
     data: { labels: t.labels, datasets: groups.map((g, i) => ({
       label: g, data: t.series[i], borderColor: colors[g], backgroundColor: colors[g],
-      tension: 0.25, pointRadius: 2, borderWidth: 2, fill: false
+      tension: 0.25, pointRadius: 2, borderWidth: 2, fill: false,
+      hidden: activeFocusKey ? (g !== activeFocusKey) : false
     })) },
-    options: styledOpts({ plugins: { legend: { labels: { color: textColor() } }, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${fmtRp(ctx.parsed.y)}` } } },
+    options: styledOpts({
+      plugins: {
+        legend: {
+          labels: { color: textColor() },
+          // Klik nama divisi di legend -> ISOLASI (tampilkan cuma garis itu
+          // saja + nilai di atas chart berubah jadi total KHUSUS divisi itu);
+          // klik lagi pada divisi yg sama saat sudah terisolasi -> kembali
+          // menampilkan semua garis + total keseluruhan. Hanya utk kartu
+          // ribbon Omset (lihat isRibbonOmset).
+          onClick: isRibbonOmset ? (evt, legendItem, legend) => {
+            const ci = legend.chart;
+            const idx = legendItem.datasetIndex;
+            const clickedGroup = groups[idx];
+            const onlyThisVisible = ci.isDatasetVisible(idx) &&
+              groups.every((g, i) => i === idx || !ci.isDatasetVisible(i));
+            if (onlyThisVisible) {
+              groups.forEach((g, i) => { ci.getDatasetMeta(i).hidden = false; });
+              lbpDivTrendLegendFocus.field = null;
+              lbpDivTrendLegendFocus.key = null;
+            } else {
+              groups.forEach((g, i) => { ci.getDatasetMeta(i).hidden = (i !== idx); });
+              lbpDivTrendLegendFocus.field = field;
+              lbpDivTrendLegendFocus.key = clickedGroup;
+            }
+            ci.update();
+            updateLbpDivTrendTotalValue(rows, field, total);
+          } : undefined
+        },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${fmtRp(ctx.parsed.y)}` } }
+      },
       scales: { x: { ticks: { font: { size: 10 }, color: textColor() }, grid: { display: false } },
         y: { ticks: { font: { size: 10 }, color: textColor(), callback: v => fmtNum(v / 1000000, 0) + " Jt" }, grid: { color: gridColor() } } } })
   });
+  if (isRibbonOmset) updateLbpDivTrendTotalValue(rows, field, total);
+}
+/* Plugin: label "keluar" (leader-line/callout, semacam tanda panah) KHUSUS
+   donat "% Donat per Divisi" pada kartu Tren Omset ribbon Omset
+   (chart-lbpDivTrend, HANYA saat mode donat aktif -- gate ganda lewat id
+   canvas + config.type "doughnut" supaya tidak ikut tergambar saat canvas yg
+   sama dipakai ulang utk mode garis/bar). Tiap slice diberi garis kecil yang
+   menjorok keluar dari tepi lingkaran, diikuti titik, lalu teks 2 baris:
+   judul (nama Divisi, mis. "CWC") pada baris pertama, lalu "persentase •
+   nilai Rp" pada baris kedua -- PERSIS spt yg diminta ("judulnya Divisi
+   semisal CWC, persentasenya dan nilainya omset"). */
+const donutOutsideLabelsPlugin = {
+  id: "donutOutsideLabels",
+  afterDraw(chart) {
+    if (chart.canvas.id !== "chart-lbpDivTrend" || chart.config.type !== "doughnut") return;
+    const opt = (chart.options.plugins && chart.options.plugins.donutOutsideLabels) || {};
+    if (!opt.enabled) return;
+    const meta = chart.getDatasetMeta(0);
+    const ds = chart.data.datasets[0];
+    if (!meta || !meta.data || !meta.data.length || !ds) return;
+    const total = ds.data.reduce((a, v) => a + Math.abs(v || 0), 0);
+    if (!total) return;
+    const ctx = chart.ctx;
+    const col = opt.textColor || "#333";
+
+    // ---- Pass 1: hitung titik anchor (di tepi slice) & sisi (kiri/kanan)
+    // tiap label, TANPA menggambar dulu -- supaya bisa dikoreksi tabrakannya
+    // dulu (lihat Pass 2) sebelum benar-benar digambar (Pass 3). Perlu
+    // khusus utk slice yang sangat kecil & berdekatan (mis. "M1" &
+    // "Unclassified" yang sama-sama tipis di dekat jam 12), yang kalau
+    // digambar apa adanya akan saling tindih tulisannya.
+    const items = [];
+    meta.data.forEach((arc, i) => {
+      const val = ds.data[i];
+      if (!val || arc.hidden) return;
+      const cx = arc.x, cy = arc.y;
+      const mid = (arc.startAngle + arc.endAngle) / 2;
+      const cos = Math.cos(mid), sin = Math.sin(mid);
+      const outerR = arc.outerRadius;
+      const x0 = cx + cos * outerR, y0 = cy + sin * outerR;
+      const x1 = cx + cos * (outerR + 14), y1 = cy + sin * (outerR + 14);
+      const dir = cos >= -0.02 ? 1 : -1;
+      const x2 = x1 + dir * 22;
+      items.push({ i, val, x0, y0, x1, y1, x2, y2: y1, dir });
+    });
+
+    // ---- Pass 2: koreksi tabrakan -- per SISI (kiri/kanan), urutkan label
+    // dari atas ke bawah lalu geser ke bawah kalau jaraknya kurang dari
+    // tinggi 1 blok label (2 baris teks), supaya semua tetap terbaca.
+    const MIN_GAP = 26;
+    [1, -1].forEach(side => {
+      const sideItems = items.filter(it => it.dir === side).sort((a, b) => a.y2 - b.y2);
+      for (let k = 1; k < sideItems.length; k++) {
+        const prev = sideItems[k - 1], cur = sideItems[k];
+        if (cur.y2 - prev.y2 < MIN_GAP) cur.y2 = prev.y2 + MIN_GAP;
+      }
+    });
+
+    // ---- Pass 3: gambar garis siku (radial -> vertikal -> horizontal) +
+    // titik + teks 2 baris (judul Divisi, lalu "persentase • nilai Rp"). Segmen
+    // vertikal otomatis 0 panjang (tidak kelihatan) kalau posisinya tidak
+    // perlu digeser oleh Pass 2 di atas.
+    ctx.save();
+    items.forEach(it => {
+      const { i, val, x0, y0, x1, y1, x2, y2, dir } = it;
+      const color = Array.isArray(ds.backgroundColor) ? ds.backgroundColor[i] : ds.backgroundColor;
+      ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineTo(x1, y2); ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(x0, y0, 2.6, 0, Math.PI * 2); ctx.fill();
+      ctx.textAlign = dir > 0 ? "left" : "right";
+      ctx.textBaseline = "alphabetic";
+      const tx = x2 + dir * 5;
+      const pct = total ? (val / total * 100) : 0;
+      // CATATAN PENTING: sengaja panggil omsetPctFmt/fmtRp langsung (BUKAN
+      // lewat properti fungsi yg dikirim dari config chart) -- Chart.js
+      // membungkus SELURUH pohon "options.plugins.*" dengan resolver
+      // "scriptable options": tiap properti bernilai function otomatis
+      // DIPANGGIL SENDIRI oleh Chart.js saat diakses (dgn argumen context
+      // internal miliknya, bukan argumen kita), jadi mengirim fungsi
+      // formatter lewat config akan error ("Cannot convert object to
+      // primitive value"). Karena plugin ini sudah di-gate khusus utk
+      // chart-lbpDivTrend, formatter yg dipakai sudah pasti tetap
+      // (omsetPctFmt/fmtRp), jadi tidak perlu dikirim lewat config sama
+      // sekali.
+      const pctText = omsetPctFmt(pct);
+      const valText = fmtRp(val);
+      ctx.font = "700 11px Segoe UI, Arial, sans-serif";
+      ctx.fillStyle = col;
+      ctx.fillText(String(chart.data.labels[i]), tx, y2 - 2);
+      ctx.font = "400 10px Segoe UI, Arial, sans-serif";
+      ctx.fillText(`${pctText} • ${valText}`, tx, y2 + 11);
+    });
+    ctx.restore();
+  }
+};
+if (typeof Chart !== "undefined") Chart.register(donutOutsideLabelsPlugin);
+/* Mode "% Donat" khusus utk kartu "Tren Omset" di ribbon Omset (SESUAI
+   PERMINTAAN: hanya kartu ini, TIDAK berlaku utk salinannya di Home) --
+   saat dicentang, chart trend (garis/bar per waktu) berubah total menjadi
+   donat komposisi Omset per Divisi utk keseluruhan periode yang difilter,
+   konsepnya identik dgn donat Bad Stock (renderBsDonut), ditambah label
+   keluar (leader-line) per divisi lewat donutOutsideLabelsPlugin di atas. */
+function renderLbpDivTrendDonut(canvasId, chartKey) {
+  const rows = fLbp();
+  // Donat SEKARANG ikut mode dropdown grouping (filter di pojok kanan atas
+  // kartu) yg lagi aktif (SESUAI PERMINTAAN): "utama" (M1/M245/M3) -> 3
+  // warna, "divisi" (BIS/CWC/MU/M3) -> 4 warna. Mode "all" (Omset All, satu
+  // batang tanpa breakdown) tidak dikenal donat, jadi fallback ke skema
+  // divisi (4 warna) supaya tetap ada breakdown yg masuk akal.
+  const groupMode = lbpDivTrend.grouping;
+  const isUtama = groupMode === "utama";
+  const field = isUtama ? "mainGroup" : "division";
+  const groups = isUtama ? ["M1", "M245", "M3"] : ["BIS", "CWC", "MU", "M3"];
+  // Warna DISAMAKAN dgn warna garis di mode line/bar (renderLbpDivTrendGeneric)
+  // supaya 1 divisi/grup selalu 1 warna yg sama walau gonta-ganti mode tampilan.
+  const colorMap = isUtama
+    ? { M1: SEM.red, M245: SEM.green, M3: SEM.blue }
+    : { BIS: SEM.red, CWC: SEM.yellow, MU: SEM.green, M3: SEM.blue };
+  const sums = {};
+  groups.forEach(g => { sums[g] = 0; });
+  let unclassified = 0;
+  rows.forEach(r => { const key = r[field]; if (sums[key] !== undefined) sums[key] += r.omset; else unclassified += r.omset; });
+  const total = lbpOmsetTotal(rows);
+  const labels = [], data = [], colors = [];
+  groups.forEach(g => { if (sums[g]) { labels.push(g); data.push(sums[g]); colors.push(colorMap[g]); } });
+  if (Math.abs(unclassified) > 0.01) { labels.push("Unclassified"); data.push(unclassified); colors.push(SEM.gray); }
+  if (ensureEmptyState(canvasId, data.length === 0)) return;
+  destroyChart(chartKey);
+  const ch = new Chart(document.getElementById(canvasId), {
+    type: "doughnut",
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: cardBg(), borderWidth: 3, hoverOffset: 16, hoverBorderWidth: 4 }] },
+    options: styledOpts({
+      cutout: "62%",
+      scales: {},
+      // Ruang ekstra di kiri/kanan supaya label leader-line tidak terpotong
+      // tepi kartu (donatnya jadi sedikit lebih kecil di tengah, tapi label
+      // di sekelilingnya tetap penuh terbaca). Padding atas dikecilkan krn
+      // legend sudah dipindah ke pojok kanan atas (lihat plugins.legend di
+      // bawah) & otomatis mengambil jatah ruang atasnya sendiri.
+      // Bottom diberi jatah lebih besar drpd top -- legend skrg di pojok
+      // kanan ATAS jadi otomatis sudah menyisihkan ruangnya sendiri di atas,
+      // tapi label leader-line di sisi BAWAH donat (mis. slice jam 6) butuh
+      // ruang ekstra sendiri di bawah supaya tidak terpotong tepi canvas.
+      layout: { padding: { left: 120, right: 120, top: 20, bottom: 54 } },
+      plugins: {
+        // Titik-titik penanda divisi DIPINDAH dari bawah ke POJOK KANAN
+        // ATAS grafik (position "top" + align "end"), dgn styling lebih
+        // rapi/halus (dot bulat kecil, spacing lega) -- rapikan tampilan
+        // sesuai permintaan.
+        legend: {
+          position: "top", align: "end",
+          labels: {
+            color: textColor(), usePointStyle: true, pointStyle: "circle",
+            boxWidth: 8, boxHeight: 8, padding: 14, font: { size: 11, weight: 600 }
+          }
+        },
+        tooltip: { callbacks: { label: (ctx) => { const pct = total ? (ctx.parsed / total * 100) : 0; return `${ctx.label}: ${fmtRp(ctx.parsed)} (${omsetPctFmt(pct)})`; } } },
+        donutOutsideLabels: { enabled: true, textColor: textColor() }
+      }
+    })
+  });
+  ch._lbpDivTrendTotal = total;
+  CHARTS[chartKey] = ch;
 }
 function renderLbpDivTrend() {
+  if (showPercent.lbpDivTrend) { renderLbpDivTrendDonut("chart-lbpDivTrend", "lbpDivTrend"); return; }
   renderLbpDivTrendGeneric("chart-lbpDivTrend", "lbpDivTrend", lbpDivTrend.grouping, chartModes.lbpDivTrend);
 }
 function renderLbpDivTrendHome() {
@@ -16689,8 +17206,21 @@ function resetAllData() {
   omsetChannelFilter.selected = null;
   const omsetSearchInputReset = document.getElementById("omsetSearchInput");
   if (omsetSearchInputReset) omsetSearchInputReset.value = "";
+  const omsetWilayahSearchInputReset = document.getElementById("omsetWilayahSearchInput");
+  if (omsetWilayahSearchInputReset) omsetWilayahSearchInputReset.value = "";
   buildOmsetDetailFilterUI();
   buildOmsetWilayahDropdowns();
+  lbpDivTrendLegendFocus.field = null;
+  lbpDivTrendLegendFocus.key = null;
+  lbpSalesmanKartonMode.karton = false;
+  lbpSalesmanKartonMode.pctKarton = false;
+  lbpSalesmanClickDetail.salesman = null;
+  const lbpSmKartonCbReset = document.getElementById("lbpSalesmanKartonToggle");
+  if (lbpSmKartonCbReset) lbpSmKartonCbReset.checked = false;
+  const lbpSmPctKartonCbReset = document.getElementById("lbpSalesmanPctKartonToggle");
+  if (lbpSmPctKartonCbReset) lbpSmPctKartonCbReset.checked = false;
+  const lbpSmPctOmsetCbReset = document.querySelector('input[data-percent-target="lbpSalesman"]');
+  if (lbpSmPctOmsetCbReset) lbpSmPctOmsetCbReset.checked = false;
   buildBsFilterUI();
   buildArFilterUI();
   const arModeSelectReset = document.getElementById("arModeSelect");
@@ -19067,6 +19597,11 @@ function init() {
   if (divGroupSel) {
     divGroupSel.addEventListener("change", (e) => {
       lbpDivTrend.grouping = e.target.value;
+      // Set grup yg tersedia berubah antar mode (mis. "CWC" tidak ada di
+      // mode M1/M245/M3) -- reset fokus isolate legend supaya tidak
+      // "nyangkut" ke grup yg sudah tidak relevan.
+      lbpDivTrendLegendFocus.field = null;
+      lbpDivTrendLegendFocus.key = null;
       renderLbpDivTrend();
     });
   }
@@ -19131,6 +19666,8 @@ function init() {
   if (omsetWilayahKecSel) omsetWilayahKecSel.addEventListener("change", renderOmsetWilayah);
   const omsetWilayahKabSel = document.getElementById("omsetWilayahKabupatenSelect");
   if (omsetWilayahKabSel) omsetWilayahKabSel.addEventListener("change", renderOmsetWilayah);
+  const omsetWilayahSearchInputEl = document.getElementById("omsetWilayahSearchInput");
+  if (omsetWilayahSearchInputEl) omsetWilayahSearchInputEl.addEventListener("input", applyOmsetWilayahSearch);
   const omsetSearchInputEl = document.getElementById("omsetSearchInput");
   if (omsetSearchInputEl) {
     // Debounce 350ms, sama seperti "Cari PCode" di EDI RO.
@@ -19309,6 +19846,65 @@ function init() {
       showValues[target] = cb.checked;
       if (CHARTS[target]) CHARTS[target].update();
     });
+  });
+  // Toggle "% kontribusi" (Omset per Kecamatan/Kabupaten, Ranking Salesman,
+  // dan mode donat khusus Tren Omset) -- BEDA dgn data-values-target di atas
+  // (yg cuma overlay label), toggle ini mengubah ISI datanya (Rp -> %, atau
+  // tipe chart utk Tren Omset), jadi perlu render ULANG penuh lewat
+  // RENDER_FN, bukan sekadar CHARTS[target].update().
+  document.querySelectorAll('input[data-percent-target]').forEach(cb => {
+    cb.addEventListener("change", () => {
+      const target = cb.getAttribute("data-percent-target");
+      showPercent[target] = cb.checked;
+      // Ranking Salesman punya 2 checkbox mode tambahan (Jumlah Karton, %
+      // Karton) yang saling eksklusif dengan checkbox "% Omset" generik ini
+      // -- kalau user centang % Omset, matikan dulu 2 mode Karton supaya
+      // renderLbpSalesman() tidak bingung mode mana yang aktif (lihat
+      // waterfall %Karton > Jumlah Karton > %Omset > Omset di renderLbpSalesman).
+      if (target === "lbpSalesman" && cb.checked) {
+        lbpSalesmanKartonMode.karton = false;
+        lbpSalesmanKartonMode.pctKarton = false;
+        const kartonCb = document.getElementById("lbpSalesmanKartonToggle");
+        const pctKartonCb = document.getElementById("lbpSalesmanPctKartonToggle");
+        if (kartonCb) kartonCb.checked = false;
+        if (pctKartonCb) pctKartonCb.checked = false;
+      }
+      if (RENDER_FN[target]) RENDER_FN[target]();
+    });
+  });
+
+  // ---- Ranking Salesman: toggle Jumlah Karton / % Karton (saling
+  // eksklusif dgn satu sama lain dan dgn checkbox "% Omset" di atas) ----
+  const lbpSalesmanKartonToggleEl = document.getElementById("lbpSalesmanKartonToggle");
+  if (lbpSalesmanKartonToggleEl) lbpSalesmanKartonToggleEl.addEventListener("change", (e) => {
+    lbpSalesmanKartonMode.karton = e.target.checked;
+    if (e.target.checked) {
+      lbpSalesmanKartonMode.pctKarton = false;
+      const pctKartonCb = document.getElementById("lbpSalesmanPctKartonToggle");
+      if (pctKartonCb) pctKartonCb.checked = false;
+      showPercent.lbpSalesman = false;
+      const pctOmsetCb = document.querySelector('input[data-percent-target="lbpSalesman"]');
+      if (pctOmsetCb) pctOmsetCb.checked = false;
+    }
+    renderLbpSalesman();
+  });
+  const lbpSalesmanPctKartonToggleEl = document.getElementById("lbpSalesmanPctKartonToggle");
+  if (lbpSalesmanPctKartonToggleEl) lbpSalesmanPctKartonToggleEl.addEventListener("change", (e) => {
+    lbpSalesmanKartonMode.pctKarton = e.target.checked;
+    if (e.target.checked) {
+      lbpSalesmanKartonMode.karton = false;
+      const kartonCb = document.getElementById("lbpSalesmanKartonToggle");
+      if (kartonCb) kartonCb.checked = false;
+      showPercent.lbpSalesman = false;
+      const pctOmsetCb = document.querySelector('input[data-percent-target="lbpSalesman"]');
+      if (pctOmsetCb) pctOmsetCb.checked = false;
+    }
+    renderLbpSalesman();
+  });
+  const lbpSalesmanClickDetailCloseBtn = document.getElementById("lbpSalesmanClickDetailClose");
+  if (lbpSalesmanClickDetailCloseBtn) lbpSalesmanClickDetailCloseBtn.addEventListener("click", () => {
+    lbpSalesmanClickDetail.salesman = null;
+    renderLbpSalesmanClickDetail();
   });
 
   // Semua link navigasi (nav atas lama + sidebar baru) dikaitkan dengan

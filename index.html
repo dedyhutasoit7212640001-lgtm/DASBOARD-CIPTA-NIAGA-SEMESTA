@@ -5503,6 +5503,25 @@ let _renderAllToken = 0;
 // pekerjaan render bertahap tanpa mengekspos variabel internal `let`
 // (yg tidak otomatis nempel ke window pada script biasa).
 window.__renderQueueLength = () => (_renderQueue ? _renderQueue.length : 0);
+// PENTING (fix bug "judul ribbon tertutup header" -- muncul SETELAH bug
+// ruang kosong di atas diperbaiki, krn sebelumnya ruang kosong itu yg
+// (tanpa sengaja) menutupi masalah ini): showPage() memanggil
+// document.getElementById("top").scrollIntoView({block:"start"}), yg
+// menyelaraskan tepi atas #top PERSIS ke tepi atas area scroll -- tapi
+// header ada di atasnya dgn position:sticky (mengambang/menempel terus
+// walau discroll), jadi kalau #top tidak diberi jarak (scroll-margin-top)
+// setinggi header, isi ribbon (judul dkk) akan discroll sampai
+// BERSEMBUNYI di BELAKANG header yg mengambang itu. `.block` (tiap
+// section ribbon) sebenarnya SUDAH punya scroll-margin-top, tapi `#top`
+// sendiri (elemen yg di-scrollIntoView, BUKAN section-nya) tidak -- jadi
+// tidak ikut kepakai. Diukur dinamis (bukan angka tetap) krn tinggi
+// header bisa berubah (nama perusahaan yg contenteditable bisa jadi 2
+// baris, ukuran layar beda, dll).
+function syncTopScrollMargin() {
+  const header = document.querySelector("header.app");
+  const topEl = document.getElementById("top");
+  if (header && topEl) topEl.style.scrollMarginTop = header.offsetHeight + "px";
+}
 // Partisi stabil: entri milik `page` (atau tanpa page/global) dipindah ke
 // DEPAN antrian, sisanya tetap berurutan spt semula. Cuma mengubah URUTAN
 // eksekusi, bukan ISI -- jadi aman dipanggil kapan saja, termasuk saat
@@ -5533,7 +5552,28 @@ function reorderRenderQueue(queue, page) {
 const SUPPORTS_CONTENT_VISIBILITY =
   typeof CSS !== "undefined" && !!CSS.supports && CSS.supports("content-visibility", "hidden");
 function showPage(page) {
-  if (!_pageEls) _pageEls = Array.from(document.querySelectorAll("[data-page]"));
+  if (!_pageEls) {
+    _pageEls = Array.from(document.querySelectorAll("[data-page]"));
+    if (SUPPORTS_CONTENT_VISIBILITY) {
+      // PENTING (fix bug "ruang kosong" di ribbon lain -- dilaporkan user
+      // lewat screenshot Cut Cost yg ada blok putih kosong besar di atas):
+      // ternyata content-visibility:hidden TIDAK membuat kotak elemennya
+      // otomatis mengecil ke 0 -- Chromium menyimpan "last remembered
+      // size" (ukuran terakhir saat elemen itu MASIH terlihat) dan tetap
+      // memakai ukuran itu utk tata letak SELAMA elemen disembunyikan.
+      // Karena elemen data-page="home" dkk masih ikut dalam alur dokumen
+      // (bukan position:absolute), ukuran "hantu" itu tetap makan tempat
+      // di ribbon lain -- itulah kotak putih kosong yg dilihat user.
+      // Fix: paksa contain-intrinsic-size kecil (bukan "auto") supaya
+      // browser TIDAK memakai last-remembered-size saat disembunyikan --
+      // box-nya collapse ke ~0 selama hidden, TANPA mengurangi manfaat
+      // cache layout internal yg bikin buka-ulang ribbon tetap instan
+      // (contain-intrinsic-size cuma berlaku selagi hidden; begitu
+      // content-visibility:visible lagi, ukurannya balik normal sesuai
+      // isi sesungguhnya).
+      _pageEls.forEach(el => { el.style.containIntrinsicSize = "0px 0px"; });
+    }
+  }
   if (!_navEls) _navEls = Array.from(document.querySelectorAll("[data-nav]"));
   // Catat ribbon yg sedang aktif (dipakai renderAll()/reorderRenderQueue()
   // di bawah supaya render ribbon yg sedang dilihat user selalu
@@ -5555,6 +5595,21 @@ function showPage(page) {
     if (SUPPORTS_CONTENT_VISIBILITY) {
       el.style.display = "";
       el.style.contentVisibility = show ? "visible" : "hidden";
+      // PENTING (lanjutan fix "ruang kosong" -- bagian KEDUA dari
+      // penyebabnya): contain-intrinsic-size di atas sudah membuat KOTAK
+      // tiap section hidden collapse ke tinggi 0, TAPI margin-top masing2
+      // section (dari class .block, 14-30px tergantung section) TERNYATA
+      // tidak ikut "collapse"/menyatu dgn section lain spt margin block
+      // biasa -- soalnya content-visibility:hidden otomatis menyalakan
+      // "layout containment", dan spek CSS containment menyebutkan tegas:
+      // elemen dgn layout containment TIDAK collapse margin dgn elemen di
+      // LUAR dirinya. Akibatnya tiap section yg disembunyikan tetap
+      // menyumbang margin-top-nya sendiri secara utuh -- dgn ~17 section
+      // tersembunyi x rata2 30px, totalnya bisa ~500px ruang kosong persis
+      // spt yg dilaporkan user (screenshot ribbon Cut Cost). Fix: nolkan
+      // margin-top secara eksplisit selagi hidden, kembalikan ke nilai
+      // asli dari stylesheet (hapus override inline) saat ditampilkan lagi.
+      el.style.marginTop = show ? "" : "0px";
     } else {
       el.style.display = show ? "" : "none";
     }
@@ -17844,6 +17899,14 @@ async function exportPPTX() {
    INIT
    ========================================================================= */
 function init() {
+  syncTopScrollMargin();
+  // Header bisa berubah tinggi (nama perusahaan contenteditable bisa
+  // jadi 2 baris, resize jendela, dll) -- pantau terus supaya jarak
+  // scroll-margin-top selalu akurat, bukan cuma dihitung sekali di awal.
+  const headerElForObserver = document.querySelector("header.app");
+  if (headerElForObserver && typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(() => syncTopScrollMargin()).observe(headerElForObserver);
+  }
   buildThemeSwatches();
   buildReasonCheckboxes();
   buildDivisionChips();

@@ -5914,8 +5914,25 @@ function showPage(page) {
   // di tengah JS -- klik nav jadi terasa instan, layout tetap beres SEBELUM
   // frame berikutnya sempat digambar (jadi user tidak melihat "lompatan"
   // posisi scroll sama sekali, persis spt sebelumnya).
+  // PENTING (perbaikan performa navigasi, lanjutan lagi -- ditemukan lewat
+  // profiling frame-demi-frame): scrollIntoView() ITU SENDIRI, walau sudah
+  // dipindah ke rAF di atas, MASIH memaksa browser menghitung POSISI elemen
+  // #top scr sinkron sblm bisa scroll ke sana -- utk menjawab "posisinya di
+  // mana", browser HARUS menuntaskan (flush) SEMUA layout yg masih
+  // tertunda di seluruh dokumen, termasuk layout ribbon yg BARU SAJA
+  // menjadi visible (content-visibility:hidden -> visible). Utk ribbon yg
+  // isinya besar & baru PERTAMA KALI dibuka setelah upload (blm pernah
+  // dihitung layout-nya sama sekali), flush ini terukur sampai ~40-90ms
+  // (Stock ~38ms, Utilisasi MyDex ~88ms) -- persis terasa sbg "patah"
+  // sesaat setelah klik ribbon tsb. #top (`<div class="wrap" id="top">`)
+  // adalah elemen PALING ATAS dlm alur dokumen (sidebar di atasnya
+  // position:fixed, tidak ikut alur), jadi scroll ke sana SELALU berarti
+  // scroll ke (0,0) -- window.scrollTo(0,0) mencapai hasil yg SAMA PERSIS
+  // tanpa perlu membaca posisi elemen apa pun, jadi TIDAK memicu flush
+  // layout paksa ini sama sekali (diverifikasi: biaya rAF ini turun dari
+  // ~88ms jadi ~0ms utk MyDex, ~38ms jadi ~0ms utk Stock).
   requestAnimationFrame(() => {
-    document.getElementById("top").scrollIntoView({ behavior: "instant", block: "start" });
+    window.scrollTo(0, 0);
   });
   // PENTING (perbaikan performa navigasi): resize() SEBELUMNYA dipanggil
   // pada SEMUA Chart.js instance yg pernah dibuat di seluruh dashboard
@@ -17358,8 +17375,77 @@ function renderAll() {
       try { item.fn(); } catch (e) { console.error("renderAll() gagal pada satu bagian:", e); }
     }
     if (_renderQueue.length) requestAnimationFrame(step);
+    // Semua render bertahap SELESAI -- ini titik yg pas utk "memanaskan"
+    // layout ribbon2 LAIN yg masih tersembunyi (lihat warmupHiddenPageLayouts()
+    // di bawah), krn isinya baru saja diperbarui (innerHTML baru) shg cache
+    // layout content-visibility lamanya (kalau ada) sudah tak berlaku lagi.
+    else warmupHiddenPageLayouts();
   }
   step();
+}
+// PENTING (perbaikan performa navigasi, lanjutan lagi -- celah yg tersisa
+// dari optimisasi content-visibility di atas): cache layout content-
+// visibility:hidden HANYA membantu kalau ribbon itu PERNAH dihitung
+// layout-nya SEBELUM disembunyikan. Begitu renderAll() menulis innerHTML
+// baru ke suatu ribbon SELAGI ribbon itu tersembunyi (kasus paling umum:
+// upload file baru sementara user sedang melihat ribbon LAIN), cache lama
+// itu tidak berlaku lagi & browser HARUS menghitung ulang dari nol pada
+// kunjungan PERTAMA user ke ribbon tsb -- diukur sampai ~90-110ms utk
+// ribbon dgn tabel besar (mis. Utilisasi MyDex, Stock), persis terasa sbg
+// "patah" sesaat setelah klik. Solusinya: begitu renderAll() selesai (data
+// sudah settle), "bayar di muka" biaya layout itu utk SEMUA ribbon yg
+// SEDANG tersembunyi, SATU PER SATU, HANYA selagi browser benar2 idle
+// (requestIdleCallback) supaya tidak bersaing dgn apa pun yg sedang
+// dikerjakan/dilihat user -- caranya: nyalakan content-visibility sebentar
+// (memaksa browser menghitung layoutnya), baca 1 properti layout apa saja
+// utk memastikan perhitungan itu benar2 terjadi SEKARANG, lalu langsung
+// sembunyikan lagi -- SEMUA dlm satu "task" JS yg sama tanpa pernah
+// mengembalikan kontrol ke browser di antaranya, jadi TIDAK PERNAH benar2
+// ter-paint/terlihat (tidak ada kedipan). Hasilnya: begitu user betulan
+// klik ribbon itu nanti, cache-nya sudah hangat & switch terasa instan
+// (~2-10ms), persis spt yg dulu diniatkan optimisasi content-visibility.
+let _warmupToken = 0;
+function warmupHiddenPageLayouts() {
+  if (!SUPPORTS_CONTENT_VISIBILITY || !_pageEls) return;
+  const myToken = ++_warmupToken;
+  let i = 0;
+  function warmNext(deadline) {
+    if (myToken !== _warmupToken) return; // dibatalkan oleh pemanggilan warmup yg lebih baru
+    while (i < _pageEls.length && (!deadline || deadline.timeRemaining() > 4 || deadline.didTimeout)) {
+      const el = _pageEls[i++];
+      const pages = el.getAttribute("data-page").split(" ");
+      if (pages.includes(_currentPage)) continue; // ribbon yg sedang aktif tak perlu dipanaskan
+      const wasHidden = el.style.contentVisibility === "hidden";
+      if (!wasHidden) continue; // sudah visible (jarang, tapi jaga2) -- lewati
+      el.style.contentVisibility = "visible";
+      el.style.marginTop = ""; // spt di showPage(): margin asli selagi "visible" agar layout dihitung persis sama
+      void el.getBoundingClientRect(); // paksa browser menghitung layout SEKARANG, selagi idle
+      el.style.contentVisibility = "hidden";
+      el.style.marginTop = "0px";
+    }
+    if (i < _pageEls.length) {
+      if (typeof requestIdleCallback !== "undefined") requestIdleCallback(warmNext, { timeout: 1500 });
+      else setTimeout(() => warmNext(null), 60);
+    }
+  }
+  if (typeof requestIdleCallback !== "undefined") requestIdleCallback(warmNext, { timeout: 1500 });
+  else setTimeout(() => warmNext(null), 60);
+}
+// Sebagian besar handler upload (mis. handleWaBlastFile, handleMydexFile,
+// dst) TIDAK lewat renderAll() -- masing2 langsung memanggil fungsi render
+// ribbon-nya sendiri (mis. renderWaBlastDependent()) lalu setUploadStatus().
+// Krn setUploadStatus() adalah "titik pusat" yg SEMUA upload/reset data
+// pasti lewati (lihat catatannya sendiri di bawah), warmup di-trigger juga
+// dari sini (didebounce 400ms spy tak restart berkali2 kalau banyak file
+// diupload beruntun spt di halaman Upload Data) -- supaya SEMUA jalur
+// upload ikut ke-cover, bukan cuma yg lewat renderAll(). Callback dijadwalkan
+// via idle/timeout (bukan langsung), jadi WALAU dipanggil SEBELUM baris
+// render spesifik di fungsi handle*File (lihat urutannya di sana), pada
+// saat callback ini benar2 jalan, render sinkron itu sudah lama tuntas.
+let _warmupDebounce = null;
+function scheduleWarmupHiddenPages() {
+  clearTimeout(_warmupDebounce);
+  _warmupDebounce = setTimeout(warmupHiddenPageLayouts, 400);
 }
 
 /* =========================================================================
@@ -17377,6 +17463,10 @@ function setUploadStatus(target, text, ok) {
   // "target" diteruskan supaya HANYA dataset yg baru berubah yg ditulis
   // ulang -- dataset lain yg besar & tidak berubah tidak ikut disalin.
   schedulePersist(target);
+  // Titik pusat yg sama juga dipakai utk menjadwalkan warmup layout ribbon2
+  // tersembunyi (lihat scheduleWarmupHiddenPages()) -- lihat catatan
+  // lengkapnya di dekat definisi warmupHiddenPageLayouts() di atas.
+  scheduleWarmupHiddenPages();
 }
 function summarizeRange(rows) {
   if (!rows.length) return "-";

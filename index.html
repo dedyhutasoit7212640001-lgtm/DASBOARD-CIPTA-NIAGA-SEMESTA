@@ -2184,6 +2184,21 @@
   .bs-crumb:hover{text-decoration:underline;}
   .bs-crumb-sep{color:var(--sub); margin:0 4px;}
   .bs-crumb-current{color:var(--text); font-weight:700;}
+  /* Tabel GIT DO (Inbound/Star Outlet) bisa berisi hingga ribuan baris.
+     Render semua <tr> sekaligus ke DOM terbukti (via profiling) bikin
+     scroll patah-patah (turun ke ~10-20fps dari normalnya 60fps).
+     content-visibility:auto TIDAK bisa dipakai di sini -- spec CSS
+     Containment melarang containment utk elemen tabel internal
+     (table-row/table-cell dst), jadi baris di luar viewport tetap kena
+     kerja layout/paint penuh walau diberi content-visibility. Solusinya
+     virtual scrolling di JS (lihat gitDoRenderVirtualWindow/
+     gitDoWireVirtualScroll di app.js): hanya baris yg sedang terlihat +
+     buffer yg benar2 dirender ke DOM, dgn 2 baris "spacer" kosong di atas
+     & bawah utk menjaga tinggi scrollbar tetap benar. Semua baris tetap
+     bisa dicapai via scroll & tetap lengkap saat export Excel (lihat
+     gitDoFullTableHtml + kasus khusus containerId==="gitDoTableWrap" di
+     exportTableToExcel()).
+  */
 
   /* ---- 2. Judul & label bergaya digital readout ----
      Aksen garis vertikal kecil + kurung siku tipis di depan judul kartu,
@@ -2546,6 +2561,7 @@
     <a href="#" data-nav="cutcost">Cut Cost</a>
     <a href="#" data-nav="openitem">Open Item</a>
     <a href="#" data-nav="ediro">EDI RO</a>
+    <a href="#" data-nav="gitdo">GIT DO</a>
     <a href="#" data-nav="mpp">MPP</a>
     <a href="#" data-nav="pnl">Profit/Loss</a>
     <a href="#" data-nav="cc">Command Center</a>
@@ -2611,6 +2627,10 @@
       <a href="#" data-nav="agingstock" class="sb-sub">Aging Stock</a>
       <a href="#" data-nav="stock" class="sb-sub">Stock</a>
     </details>
+
+    <a href="#" data-nav="gitdo" class="sb-link sb-top">
+      <span class="sb-ico">🚚</span><span class="sb-label">GIT DO</span>
+    </a>
 
     <a href="#" data-nav="mpp" class="sb-link sb-top">
       <span class="sb-ico">🧮</span><span class="sb-label">MPP</span>
@@ -2773,6 +2793,18 @@
         <div><b>DATA PROFIT/LOSS</b></div>
         <label class="btn">Pilih File<input type="file" accept=".xls,.xlsx" data-target="pnl"></label>
         <div class="status" data-status="pnl">Belum ada data</div>
+      </div>
+      <div class="card uploader" id="up-gitdoexcel">
+        <div class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8.2 12 3.2 3 8.2v7.6l9 5 9-5z"/><path d="M3 8.2l9 5 9-5M12 13.2v8"/></svg></div>
+        <div><b>GIT DO EXCEL (Pivot CNS &amp; Pivot SO)</b></div>
+        <label class="btn">Pilih File<input type="file" accept=".xls,.xlsx" data-target="gitdoexcel"></label>
+        <div class="status" data-status="gitdoexcel">Belum ada data</div>
+      </div>
+      <div class="card uploader" id="up-gitdosap">
+        <div class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+        <div><b>GIT DO SAP (Tarikan SAP)</b></div>
+        <label class="btn">Pilih File<input type="file" accept=".xls,.xlsx,.csv,.txt" data-target="gitdosap"></label>
+        <div class="status" data-status="gitdosap">Belum ada data</div>
       </div>
     </div>
     <div style="margin-top:14px; display:flex; justify-content:flex-end;">
@@ -3602,8 +3634,19 @@
         <div class="field" style="min-width:260px;"><label>Kecamatan</label><select class="mode-select" id="omsetWilayahKecamatanSelect"><option value="ALL">Pilih Kecamatan...</option></select></div>
         <div class="field" style="min-width:260px;"><label>Kabupaten / Kota</label><select class="mode-select" id="omsetWilayahKabupatenSelect"><option value="ALL">Pilih Kabupaten/Kota...</option></select></div>
       </div>
+      <div class="grid grid-kpi" id="omsetWilayahExtremeKpi" style="margin-top:12px;"></div>
       <div class="grid grid-kpi" id="omsetWilayahKecKpi" style="margin-top:10px;"></div>
-      <div class="grid grid-kpi" id="omsetWilayahKabKpi" style="margin-top:10px;"></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+        <div id="omsetWilayahKecChannelBreadcrumb" style="font-size:12px;"></div>
+        <button class="table-export-btn" data-export-table="omsetWilayahKecChannelWrap" data-export-name="Omset_Wilayah_Kecamatan_Channel">⬇️ Excel</button>
+      </div>
+      <div id="omsetWilayahKecChannelWrap" style="margin-top:6px; max-height:420px; overflow:auto;"></div>
+      <div class="grid grid-kpi" id="omsetWilayahKabKpi" style="margin-top:16px;"></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+        <div id="omsetWilayahKabChannelBreadcrumb" style="font-size:12px;"></div>
+        <button class="table-export-btn" data-export-table="omsetWilayahKabChannelWrap" data-export-name="Omset_Wilayah_Kabupaten_Channel">⬇️ Excel</button>
+      </div>
+      <div id="omsetWilayahKabChannelWrap" style="margin-top:6px; max-height:420px; overflow:auto;"></div>
     </div>
 
     <!-- ===== Widget B: Cari Toko / Pcode ===== -->
@@ -4634,6 +4677,31 @@
     </div>
   </section>
 
+  <section class="block" id="sec-gitdo" data-page="gitdo">
+    <div class="head"><h2><span class="head-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 6.5h12.5v10H1.5z"/><path d="M14 9.5h4l3.5 3.5v3.5H14z"/><circle cx="6" cy="18.5" r="2"/><circle cx="17" cy="18.5" r="2"/></svg></span><span>GIT DO</span></h2><span>Goods In Transit &amp; Delivery Order — Tarikan SAP, Inbound (Pivot CNS) &amp; Star Outlet (Pivot SO). Upload file-nya di halaman Upload Data.</span></div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div style="font-size:11px; color:var(--sub); font-weight:700; text-transform:uppercase; margin-bottom:8px;">Pilih Sumber Data</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="btn btn-primary gitdo-tab-btn" data-gitdo-tab="sap">Tarikan SAP</button>
+        <button type="button" class="btn btn-ghost gitdo-tab-btn" data-gitdo-tab="cns">Inbound</button>
+        <button type="button" class="btn btn-ghost gitdo-tab-btn" data-gitdo-tab="so">Star Outlet</button>
+      </div>
+    </div>
+
+    <div class="card chart-card" data-chart-id="gitDoTableWrap" data-chart-title="GIT DO">
+      <div id="chart-gitDoTableWrap" style="display:none;"></div>
+      <div class="grid grid-kpi" id="gitDoSummary" style="margin-bottom:12px;"></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div id="gitDoBreadcrumb" style="font-size:12px;"></div>
+        <div id="gitDoFilterBar" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;"></div>
+        <button class="table-export-btn" data-export-table="gitDoTableWrap" data-export-name="GIT_DO">⬇️ Excel</button>
+      </div>
+      <div id="gitDoCount" style="font-size:12px; color:var(--sub); font-weight:700; margin:6px 0;"></div>
+      <div id="gitDoTableWrap" style="margin-top:6px; max-height:600px; overflow:auto;"></div>
+    </div>
+  </section>
+
   <section class="block" id="sec-cc" data-page="cc">
 
     <div class="ccy-wrap">
@@ -5346,7 +5414,7 @@ function cardBg() { return getComputedStyle(document.documentElement).getPropert
 function CV(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
 /* ---------- State ---------- */
-const DB = { epe: [], qty: [], outlet: [], lbp: [], bs: [], ar: [], stockOpname: [], waBlast: [], cutCost: [], utilGudang: null, openItem: [], ediRo: [], mpp: null, pnl: [], inbound: [], prestasi: [], sending: [], agingStock: [], mydex: [], stockGudang: [], ediStock: [] };
+const DB = { epe: [], qty: [], outlet: [], lbp: [], bs: [], ar: [], stockOpname: [], waBlast: [], cutCost: [], utilGudang: null, openItem: [], ediRo: [], mpp: null, pnl: [], inbound: [], prestasi: [], sending: [], agingStock: [], mydex: [], stockGudang: [], ediStock: [], gitdoSap: [], gitdoCns: [], gitdoSo: [] };
 
 /* =========================================================================
    PENYIMPANAN LOKAL (IndexedDB) — supaya data yang sudah diupload TIDAK
@@ -5387,7 +5455,16 @@ const UPLOAD_TARGET_TO_DBKEY = {
   stockopname: "stockOpname", wablast: "waBlast", cutcost: "cutCost",
   utilgudang: "utilGudang", openitem: "openItem", ediro: "ediRo", mpp: "mpp",
   pnl: "pnl", inbound: "inbound", prestasi: "prestasi", sending: "sending",
-  agingstock: "agingStock", mydex: "mydex", stockgudang: "stockGudang", edistock: "ediStock"
+  agingstock: "agingStock", mydex: "mydex", stockgudang: "stockGudang", edistock: "ediStock",
+  gitdosap: "gitdoSap"
+  // CATATAN: target upload "gitdoexcel" SENGAJA tidak dimasukkan di sini --
+  // 1 file GIT DO Excel mengisi DUA dataset sekaligus (gitdoCns & gitdoSo,
+  // dari 2 sheet Pivot berbeda dlm 1 workbook), sedangkan mapping 1:1 ini
+  // tidak bisa mewakili itu. schedulePersist("gitdoexcel") akan otomatis
+  // jatuh ke jalur fallback "tandai SEMUA key DB kotor" (lihat
+  // schedulePersist() di bawah) -- tetap benar datanya, hanya sedikit lebih
+  // berat krn ikut menulis ulang dataset lain yg sebenarnya tidak berubah;
+  // upload file ini sendiri jarang terjadi jadi ini bukan masalah performa.
 };
 const uploadStatusMeta = {}; // target -> HTML status terakhir (utk restore tampilan kotak upload)
 let _idbConnPromise = null;
@@ -5610,6 +5687,20 @@ const dimFilter = { sales: "ALL", kecamatan: "ALL", kabupaten: "ALL" };
    atas -- sesuai permintaan user "ada juga didalam kolom ini filter per
    divisi" pada tiap widget). Semua tetap ikut filter tanggal GLOBAL (inRange). */
 const omsetWilayahFilter = { divisions: new Set(DIVISIONS) };
+// Drill-down Channel -> Toko di dalam widget Ringkasan Wilayah, terpisah utk
+// sub-bagian Kecamatan vs Kabupaten/Kota (keduanya tampil bersamaan, jadi
+// masing2 perlu status drill sendiri2, tidak boleh saling menimpa).
+const omsetWilayahKecChannelDrill = { channel: null };
+const omsetWilayahKabChannelDrill = { channel: null };
+/* Ribbon GIT DO -- 3 sumber data ditampilkan bergantian lewat 1 tab switch
+   ("sap"=Tarikan SAP, "cns"=Inbound/Pivot CNS, "so"=Star Outlet/Pivot SO).
+   gitDoFilters: dropdown filter ala Excel autofilter (bukan lagi klik-sel
+   per baris / kotak search bebas -- diganti sesuai permintaan user) --
+   field yg tersedia beda per tab: SAP = divisi/skuId/skuName, Inbound &
+   Star Outlet = rom/idGabName/divisi/noDo. "" berarti "Semua" (tak
+   difilter). Semua filter yg aktif digabung dgn AND. */
+const gitDoFilter = { tab: "sap" };
+const gitDoFilters = { divisi: "", skuId: "", skuName: "", rom: "", idGabName: "", noDo: "" };
 const omsetSearchFilter = { divisions: new Set(DIVISIONS), query: "" };
 const omsetChannelFilter = { divisions: new Set(DIVISIONS), selected: null };
 const rankMode = { kecamatan: "top10", kabupaten: "top10" };
@@ -9972,9 +10063,11 @@ function lbpOrderDetailTableHtml(rows) {
    SELURUH data pada periode+filter Divisi widget ini yang sedang aktif
    (baseKarton/baseOmset -- dihitung dari SELURUH baris "base", bukan cuma
    yang mempunyai Kecamatan/Kabupaten). */
-function omsetKartonOmsetKpiHtml(label, karton, omset, baseKarton, baseOmset) {
+function omsetKartonOmsetKpiHtml(label, karton, omset, baseKarton, baseOmset, tokoCount, baseToko) {
   const pctKarton = baseKarton ? (karton / baseKarton * 100) : 0;
   const pctOmset = baseOmset ? (omset / baseOmset * 100) : 0;
+  const hasToko = tokoCount !== undefined;
+  const pctToko = hasToko && baseToko ? (tokoCount / baseToko * 100) : 0;
   return `
     <div class="card kpi-card">
       <div class="icon-circle">${ico('box')}</div>
@@ -9991,7 +10084,162 @@ function omsetKartonOmsetKpiHtml(label, karton, omset, baseKarton, baseOmset) {
     <div class="card kpi-card">
       <div class="icon-circle">${ico('money')}</div>
       <div class="body"><div class="label">% Omset — ${label}</div><div class="value">${omsetPctFmt(pctOmset)}</div></div>
+    </div>${hasToko ? `
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico('store')}</div>
+      <div class="body"><div class="label">Jumlah Toko — ${label}</div><div class="value">${fmtInt(tokoCount)}</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico('store')}</div>
+      <div class="body"><div class="label">% Jumlah Toko — ${label}</div><div class="value">${omsetPctFmt(pctToko)}</div></div>
+    </div>` : ""}`;
+}
+/* Kecamatan/Kabupaten dgn Jumlah Toko TERBANYAK & TERSEDIKIT -- dihitung dari
+   SELURUH data "base" (TIDAK tergantung pilihan dropdown Kecamatan/Kabupaten
+   yg sedang aktif), supaya user langsung tahu wilayah mana yg paling ramai
+   dan paling sedikit tokonya tanpa harus mencoba satu per satu di dropdown. */
+function wilayahTokoExtremes(base, field) {
+  const map = new Map();
+  base.forEach(r => {
+    const wilayah = r[field];
+    if (!wilayah) return;
+    if (!map.has(wilayah)) map.set(wilayah, new Set());
+    const k = r.outletCode || r.outletName;
+    if (k) map.get(wilayah).add(k);
+  });
+  const list = Array.from(map.entries()).map(([wilayah, set]) => ({ wilayah, toko: set.size }));
+  if (!list.length) return { max: null, min: null };
+  list.sort((a, b) => b.toko - a.toko);
+  return { max: list[0], min: list[list.length - 1] };
+}
+function wilayahExtremeKpiCardHtml(icon, label, item) {
+  return `
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico(icon)}</div>
+      <div class="body"><div class="label">${label}</div>
+        <div class="value" style="font-size:15px; line-height:1.3; word-break:break-word;">${item ? item.wilayah : "-"}</div>
+        <div class="sub">${item ? `${fmtInt(item.toko)} Toko` : "Belum ada data"}</div></div>
     </div>`;
+}
+/* ---- Detail Channel per wilayah terpilih (Kecamatan atau Kabupaten/Kota) ----
+   Drill 2 tingkat: Channel -> daftar Toko dalam channel tsb. Jumlah Toko per
+   Channel TIDAK selalu aditif ke 100% (kalau 1 toko yg sama pernah tercatat
+   di >1 Channel berbeda pd periode berbeda), sama seperti catatan pd Widget C
+   "Channel Penyumbang Omset" di atas -- ini wajar/diharapkan. */
+function wilayahChannelSummary(rows) {
+  const map = new Map();
+  rows.forEach(r => {
+    if (!r.channel) return;
+    if (!map.has(r.channel)) map.set(r.channel, { channel: r.channel, karton: 0, omset: 0, tokoSet: new Set() });
+    const o = map.get(r.channel);
+    o.karton += (r.karton || 0);
+    o.omset += r.omset;
+    const k = r.outletCode || r.outletName;
+    if (k) o.tokoSet.add(k);
+  });
+  return Array.from(map.values())
+    .map(o => ({ channel: o.channel, karton: o.karton, omset: o.omset, tokoCount: o.tokoSet.size }))
+    .sort((a, b) => b.tokoCount - a.tokoCount);
+}
+function wilayahStoreListByChannel(rows, channel) {
+  const map = new Map();
+  rows.filter(r => r.channel === channel).forEach(r => {
+    const k = r.outletCode || r.outletName;
+    if (!k) return;
+    if (!map.has(k)) map.set(k, { outletCode: r.outletCode || "", outletName: r.outletName || "", karton: 0, omset: 0 });
+    const o = map.get(k);
+    o.karton += (r.karton || 0);
+    o.omset += r.omset;
+  });
+  return Array.from(map.values()).sort((a, b) => b.omset - a.omset);
+}
+function renderWilayahChannelDetail(rows, drillState, wrapId, crumbId, wilayahLabel) {
+  const wrap = document.getElementById(wrapId);
+  const crumbEl = document.getElementById(crumbId);
+  if (!wrap) return;
+  if (!rows.length) {
+    wrap.innerHTML = "";
+    if (crumbEl) crumbEl.innerHTML = "";
+    return;
+  }
+  const grandTokoSet = new Set();
+  rows.forEach(r => { const k = r.outletCode || r.outletName; if (k) grandTokoSet.add(k); });
+  const grandToko = grandTokoSet.size;
+  // Fallback defensif: kalau channel yg sedang di-drill sudah tidak ada lagi
+  // di data hasil filter/pilihan wilayah saat ini, naik otomatis ke level
+  // "Semua Channel" -- supaya tidak menampilkan tabel kosong tanpa penjelasan.
+  if (drillState.channel && !wilayahChannelSummary(rows).some(o => o.channel === drillState.channel)) {
+    drillState.channel = null;
+  }
+  if (crumbEl) {
+    const parts = [`<a href="#" class="bs-crumb" data-wch-crumb="root">📋 Semua Channel — ${wilayahLabel}</a>`];
+    if (drillState.channel) {
+      parts.push(`<span class="bs-crumb-sep">›</span><span class="bs-crumb-current">${drillState.channel}</span>`);
+    }
+    crumbEl.innerHTML = parts.join(" ");
+    crumbEl.querySelectorAll("[data-wch-crumb]").forEach(a => {
+      a.addEventListener("click", (e) => { e.preventDefault(); drillState.channel = null; renderOmsetWilayah(); });
+    });
+  }
+  let html;
+  if (!drillState.channel) {
+    const list = wilayahChannelSummary(rows);
+    if (!list.length) { wrap.innerHTML = '<div class="exec-empty">Belum ada data Channel untuk wilayah ini.</div>'; return; }
+    html = `<table class="ar-table prestasi-table">
+      <thead><tr>
+        <th>No</th><th>Channel</th>
+        <th style="text-align:right;">Jumlah Toko</th><th style="text-align:right;">% Jumlah Toko</th><th>Detail</th>
+      </tr></thead>
+      <tbody>
+        ${list.map((o, i) => `<tr>
+          <td>${i + 1}</td><td>${o.channel}</td>
+          <td style="text-align:right;">${fmtInt(o.tokoCount)}</td>
+          <td style="text-align:right;">${omsetPctFmt(grandToko ? o.tokoCount / grandToko * 100 : 0)}</td>
+          <td><button class="btn btn-ghost btn-sm wilayah-channel-detail-btn" data-wrap="${wrapId}" data-channel="${o.channel.replace(/"/g, "&quot;")}" style="padding:4px 10px; font-size:11px;">🔍 Detail</button></td>
+        </tr>`).join("")}
+      </tbody>
+      <tfoot>
+        <tr style="font-weight:800; border-top:2px solid var(--line);">
+          <td colspan="2">GRAND TOTAL — ${fmtInt(list.length)} Channel • ${wilayahLabel}</td>
+          <td style="text-align:right;">${fmtInt(grandToko)}</td>
+          <td style="text-align:right;">${omsetPctFmt(100)}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>`;
+  } else {
+    const list = wilayahStoreListByChannel(rows, drillState.channel);
+    if (!list.length) { wrap.innerHTML = '<div class="exec-empty">Belum ada data Toko untuk channel ini.</div>'; return; }
+    const grandKarton = list.reduce((a, o) => a + o.karton, 0);
+    const grandOmset = list.reduce((a, o) => a + o.omset, 0);
+    html = `<table class="ar-table prestasi-table">
+      <thead><tr>
+        <th>No</th><th>Kode Toko</th><th>Nama Toko</th>
+        <th style="text-align:right;">Total Isi Karton</th><th style="text-align:right;">Omset (Harga Bruto)</th>
+      </tr></thead>
+      <tbody>
+        ${list.map((o, i) => `<tr>
+          <td>${i + 1}</td><td>${o.outletCode || "-"}</td><td>${o.outletName || "-"}</td>
+          <td style="text-align:right;">${fmtNum(o.karton, 2)}</td>
+          <td style="text-align:right;">${fmtRp(o.omset)}</td>
+        </tr>`).join("")}
+      </tbody>
+      <tfoot>
+        <tr style="font-weight:800; border-top:2px solid var(--line);">
+          <td colspan="3">GRAND TOTAL — ${fmtInt(list.length)} Toko • ${drillState.channel}</td>
+          <td style="text-align:right;">${fmtNum(grandKarton, 2)}</td>
+          <td style="text-align:right;">${fmtRp(grandOmset)}</td>
+        </tr>
+      </tfoot>
+    </table>`;
+  }
+  wrap.innerHTML = html;
+  wrap.querySelectorAll(".wilayah-channel-detail-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      drillState.channel = btn.getAttribute("data-channel");
+      renderOmsetWilayah();
+    });
+  });
 }
 function renderOmsetWilayah() {
   const kecSel = document.getElementById("omsetWilayahKecamatanSelect");
@@ -10002,23 +10250,58 @@ function renderOmsetWilayah() {
   const base = fLbpBase(omsetWilayahFilter.divisions);
   const baseKarton = base.reduce((a, r) => a + (r.karton || 0), 0);
   const baseOmset = lbpOmsetTotal(base);
+  // Jumlah Toko unik SELURUH base (dipakai sbg pembagi %) -- toko diidentifikasi
+  // via outletCode (fallback outletName kalau outletCode kosong), pola yg sama
+  // persis dgn Widget C "Channel Penyumbang Omset" di atas. Beda dgn Channel
+  // (1 toko bisa tembus >1 Channel shg %-nya bisa >100% kalau dijumlah), di sini
+  // 1 toko cuma ada di 1 Kecamatan & 1 Kabupaten/Kota saja, jadi %-nya aditif.
+  const baseTokoSet = new Set();
+  base.forEach(r => { const k = r.outletCode || r.outletName; if (k) baseTokoSet.add(k); });
+  const baseToko = baseTokoSet.size;
+  const tokoCount = (rows) => {
+    const s = new Set();
+    rows.forEach(r => { const k = r.outletCode || r.outletName; if (k) s.add(k); });
+    return s.size;
+  };
+  // Kartu insight "Kecamatan/Kabupaten Toko Terbanyak & Tersedikit" -- selalu
+  // dihitung dari SELURUH wilayah (base), tidak tergantung pilihan dropdown.
+  const extremeWrap = document.getElementById("omsetWilayahExtremeKpi");
+  if (extremeWrap) {
+    const kecExtremes = wilayahTokoExtremes(base, "kecamatan");
+    const kabExtremes = wilayahTokoExtremes(base, "kabupaten");
+    extremeWrap.innerHTML =
+      wilayahExtremeKpiCardHtml("store", "Kecamatan Toko Terbanyak", kecExtremes.max) +
+      wilayahExtremeKpiCardHtml("store", "Kecamatan Toko Tersedikit", kecExtremes.min) +
+      wilayahExtremeKpiCardHtml("store", "Kabupaten/Kota Toko Terbanyak", kabExtremes.max) +
+      wilayahExtremeKpiCardHtml("store", "Kabupaten/Kota Toko Tersedikit", kabExtremes.min);
+  }
   const kecVal = kecSel ? kecSel.value : "ALL";
   const kabVal = kabSel ? kabSel.value : "ALL";
   if (!kecVal || kecVal === "ALL") {
     kecKpiWrap.innerHTML = `<div class="exec-empty" style="grid-column:1/-1;">Pilih Kecamatan di atas untuk melihat Total Isi Karton &amp; Total Omset-nya.</div>`;
+    const kecChWrap = document.getElementById("omsetWilayahKecChannelWrap");
+    const kecChCrumb = document.getElementById("omsetWilayahKecChannelBreadcrumb");
+    if (kecChWrap) kecChWrap.innerHTML = "";
+    if (kecChCrumb) kecChCrumb.innerHTML = "";
   } else {
     const rows = base.filter(r => r.kecamatan === kecVal);
     const karton = rows.reduce((a, r) => a + (r.karton || 0), 0);
     const omset = lbpOmsetTotal(rows);
-    kecKpiWrap.innerHTML = omsetKartonOmsetKpiHtml(`Kec. ${kecVal}`, karton, omset, baseKarton, baseOmset);
+    kecKpiWrap.innerHTML = omsetKartonOmsetKpiHtml(`Kec. ${kecVal}`, karton, omset, baseKarton, baseOmset, tokoCount(rows), baseToko);
+    renderWilayahChannelDetail(rows, omsetWilayahKecChannelDrill, "omsetWilayahKecChannelWrap", "omsetWilayahKecChannelBreadcrumb", `Kec. ${kecVal}`);
   }
   if (!kabVal || kabVal === "ALL") {
     kabKpiWrap.innerHTML = `<div class="exec-empty" style="grid-column:1/-1;">Pilih Kabupaten/Kota di atas untuk melihat Total Isi Karton &amp; Total Omset-nya.</div>`;
+    const kabChWrap = document.getElementById("omsetWilayahKabChannelWrap");
+    const kabChCrumb = document.getElementById("omsetWilayahKabChannelBreadcrumb");
+    if (kabChWrap) kabChWrap.innerHTML = "";
+    if (kabChCrumb) kabChCrumb.innerHTML = "";
   } else {
     const rows = base.filter(r => r.kabupaten === kabVal);
     const karton = rows.reduce((a, r) => a + (r.karton || 0), 0);
     const omset = lbpOmsetTotal(rows);
-    kabKpiWrap.innerHTML = omsetKartonOmsetKpiHtml(`Kab./Kota ${kabVal}`, karton, omset, baseKarton, baseOmset);
+    kabKpiWrap.innerHTML = omsetKartonOmsetKpiHtml(`Kab./Kota ${kabVal}`, karton, omset, baseKarton, baseOmset, tokoCount(rows), baseToko);
+    renderWilayahChannelDetail(rows, omsetWilayahKabChannelDrill, "omsetWilayahKabChannelWrap", "omsetWilayahKabChannelBreadcrumb", `Kab./Kota ${kabVal}`);
   }
 }
 function buildOmsetWilayahDropdowns() {
@@ -12081,6 +12364,552 @@ function renderBsChannelSummary() {
 }
 function renderBsDependent() {
   renderBsKpi(); renderBsDonut(); renderBsSalesman(); renderBsTop5(); renderBsOutlet(); renderBsReason(); renderBsChannelSummary();
+}
+
+/* =========================================================================
+   GIT DO (Goods In Transit / Delivery Order) -- 3 sumber data ditampilkan
+   dlm 1 ribbon lewat tab switch, TIDAK digabung/dicocokkan satu sama lain:
+     - "Tarikan SAP"  : file export SAP "REPORT GOODS IN TRANSIT" (teks
+                        tab-delimited UTF-16, sering berekstensi .XLS).
+     - "Inbound"      : sheet "PIVOT CNS" pd file GIT DO Excel (Pivot Table).
+     - "Star Outlet"  : sheet "PIVOT SO" pd file Excel yang SAMA.
+   Sesuai permintaan user: "hanya ingin semuanya tampil sesuai judul kolom
+   yang tertera" -- setiap tab menampilkan SEMUA kolom sumber apa adanya,
+   tanpa filter tambahan, dgn kolom "No" sbg nomor urut di paling depan.
+   Klik pada sel SKU ID/SKU Name (tab Tarikan SAP) atau Divisi (tab
+   Inbound/Star Outlet) memfilter tabel ke HANYA baris dgn nilai yg sama.
+   ========================================================================= */
+function parseGitDoSapDate(s) {
+  const m = String(s || "").trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (!m) return "";
+  if (m[1] === "00" && m[2] === "00" && m[3] === "0000") return ""; // SAP: tanggal belum tersedia
+  return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+}
+// Laporan SAP ini TIDAK punya kolom Divisi eksplisit -- tapi kode Divisi
+// (M1/M2/M3/MU/BIS/CWC, sama persis dgn skema yg dipakai di ribbon lain)
+// SELALU muncul sbg salah satu "kata" di dalam teks Ship To Party, baik di
+// akhir dlm tanda kurung (mis. "...METRO (M2)") maupun di tengah utk baris
+// Star Outlet (mis. "RAMA JAYA,TK /SO M3 (CNS)"). Ambil kemunculan PALING
+// KANAN (paling dekat ke akhir string) sbg Divisi baris tsb -- diuji cocok
+// 100% (0 baris tak terklasifikasi) pd sample data asli.
+const GITDO_SAP_DIVISI_RE = /\b(M1|M2|M3|MU|BIS|CWC)\b/g;
+function parseGitDoSapDivisi(shipToParty) {
+  const matches = String(shipToParty || "").match(GITDO_SAP_DIVISI_RE);
+  return matches ? matches[matches.length - 1] : "";
+}
+function parseGitDoSapText(text) {
+  const lines = text.split(/\r\n|\r|\n/);
+  let headerRowIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const cols = lines[i].split("\t").map(s => s.trim());
+    if (cols.includes("SKU.ID.") && cols.includes("SKU.NAME") && cols.includes("QTY.GIT.")) { headerRowIdx = i; break; }
+  }
+  if (headerRowIdx < 0) throw new Error("Format file GIT DO SAP tidak dikenali (header SKU.ID./SKU.NAME/QTY.GIT. tidak ditemukan).");
+  // Posisi kolom TETAP (bukan dicari per nama) krn header "SALES EMPLOYEE"
+  // adalah 1 judul yg merentang beberapa kolom kosong pd baris header --
+  // hanya kolom index 1 (kode) & 2 (nama) yg terisi, sisanya (3-7) memang
+  // sengaja kosong di SETIAP baris data (dikonfirmasi dari sample file asli).
+  const rows = [];
+  for (let i = headerRowIdx + 1; i < lines.length; i++) {
+    const cols = lines[i].split("\t");
+    if (cols.length < 18) continue;
+    const skuId = (cols[13] || "").trim();
+    if (!skuId) continue; // baris kosong / "No Data Found....." / dll -- lewati
+    const qtyRaw = (cols[15] || "").trim().replace(/\./g, "").replace(",", ".");
+    const qty = parseFloat(qtyRaw);
+    const shipToParty = (cols[10] || "").trim();
+    rows.push({
+      salesCode: (cols[1] || "").trim(),
+      salesName: (cols[2] || "").trim(),
+      noDo: (cols[8] || "").trim(),
+      codeStp: (cols[9] || "").trim(),
+      shipToParty,
+      divisi: parseGitDoSapDivisi(shipToParty),
+      tglDo: parseGitDoSapDate(cols[11]),
+      tglGi: parseGitDoSapDate(cols[12]),
+      skuId,
+      skuName: (cols[14] || "").trim(),
+      qty: Number.isFinite(qty) ? qty : 0,
+      uom: (cols[16] || "").trim(),
+      eta: parseGitDoSapDate(cols[17])
+    });
+  }
+  if (!rows.length) throw new Error('Tidak ada baris data valid ditemukan di file GIT DO SAP (kemungkinan laporan kosong / "No Data Found").');
+  return rows;
+}
+/* Sheet "PIVOT CNS"/"PIVOT SO" -- hasil export Pivot Table Excel dgn 3
+   level pengelompokan baris (ROM > ID GAB > SHIPMENT) + baris subtotal
+   per level + 1 baris Grand Total di paling bawah. Satu-satunya cara
+   membedakan baris DATA asli dari baris SUBTOTAL: kolom SHIPMENT (index 6)
+   berisi ANGKA murni pd baris data, sedangkan pd baris subtotal berisi
+   TEKS "xxxxx Total" (atau kosong utk subtotal level yg lebih atas).
+   Kolom2 di sebelah kiri (TGL_GI, ROM, ID GAB, dst.) sering kosong pd
+   baris data ke-2/seterusnya dlm 1 grup yg sama (tampilan pivot
+   "menyatukan" sel bernilai sama scr visual) -- di-forward-fill dari
+   baris data valid TERAKHIR yg pernah terlihat. */
+function parseGitDoPivotSheet(ws, sheetLabel) {
+  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+  let headerRowIdx = -1;
+  for (let i = 0; i < Math.min(grid.length, 15); i++) {
+    const row = grid[i] || [];
+    if (row[0] === "TGL_GI" && row[9] === "NO_DO" && row[10] === "DIVISI") { headerRowIdx = i; break; }
+  }
+  if (headerRowIdx < 0) throw new Error(`Format sheet "${sheetLabel}" tidak dikenali (header TGL_GI/NO_DO/DIVISI tidak ditemukan).`);
+  const rows = [];
+  let lastTglGi = null, lastRom = "", lastIdGab = "", lastIdGabName = "", lastCodeStp = "", lastShipToParty = "";
+  for (let i = headerRowIdx + 1; i < grid.length; i++) {
+    const r = grid[i] || [];
+    const shipment = r[6];
+    if (typeof shipment !== "number") continue; // baris subtotal/grand total -- lewati
+    const tglGiRaw = r[0] != null ? r[0] : lastTglGi;
+    const rom = r[1] != null ? r[1] : lastRom;
+    const idGab = r[2] != null ? r[2] : lastIdGab;
+    const idGabName = r[3] != null ? r[3] : lastIdGabName;
+    const codeStp = r[4] != null ? r[4] : lastCodeStp;
+    const shipToParty = r[5] != null ? r[5] : lastShipToParty;
+    lastTglGi = tglGiRaw; lastRom = rom; lastIdGab = idGab; lastIdGabName = idGabName; lastCodeStp = codeStp; lastShipToParty = shipToParty;
+    rows.push({
+      tglGi: parseLbpDateCell(tglGiRaw),
+      rom: rom || "",
+      idGab: idGab != null ? String(idGab) : "",
+      idGabName: idGabName || "",
+      codeStp: codeStp != null ? String(codeStp) : "",
+      shipToParty: shipToParty || "",
+      shipment: String(shipment),
+      ekspedisi: r[7] || "",
+      nopol: r[8] || "",
+      noDo: r[9] != null ? String(r[9]) : "",
+      divisi: r[10] || "",
+      eta: parseLbpDateCell(r[11]),
+      qty: Number(r[12]) || 0
+    });
+  }
+  if (!rows.length) throw new Error(`Tidak ada baris data valid ditemukan di sheet "${sheetLabel}".`);
+  return rows;
+}
+function parseGitDoExcelWorkbook(workbook) {
+  const cnsSheet = workbook.Sheets["PIVOT CNS"];
+  const soSheet = workbook.Sheets["PIVOT SO"];
+  if (!cnsSheet && !soSheet) throw new Error('File GIT DO Excel tidak punya sheet "PIVOT CNS" maupun "PIVOT SO".');
+  return {
+    cns: cnsSheet ? parseGitDoPivotSheet(cnsSheet, "PIVOT CNS") : [],
+    so: soSheet ? parseGitDoPivotSheet(soSheet, "PIVOT SO") : []
+  };
+}
+function handleGitDoSapFile(file) {
+  showProgress("Membaca file GIT DO SAP...");
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const buf = new Uint8Array(e.target.result);
+      let text;
+      // Export SAP "REPORT GOODS IN TRANSIT" berupa teks tab-delimited
+      // UTF-16 meski berekstensi .XLS -- deteksi via BOM (pola sama dgn
+      // handleCutCostFile), fallback ke UTF-8 kalau tidak ada BOM.
+      if (buf.length >= 2 && buf[0] === 0xFF && buf[1] === 0xFE) {
+        text = new TextDecoder("utf-16le").decode(buf.slice(2));
+      } else if (buf.length >= 2 && buf[0] === 0xFE && buf[1] === 0xFF) {
+        text = new TextDecoder("utf-16be").decode(buf.slice(2));
+      } else {
+        text = new TextDecoder("utf-8").decode(buf);
+      }
+      const rows = parseGitDoSapText(text);
+      DB.gitdoSap = rows;
+      setUploadStatus("gitdosap", `<b>${file.name}</b><br>${fmtInt(rows.length)} baris`, true);
+      renderGitDo();
+      showToast(`Berhasil memuat ${file.name}`, "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Gagal memproses file GIT DO SAP: " + err.message, "error");
+    } finally { hideProgress(); }
+  };
+  reader.onerror = () => { hideProgress(); showToast("Gagal membaca file.", "error"); };
+  reader.readAsArrayBuffer(file);
+}
+function handleGitDoExcelFile(file) {
+  showProgress("Membaca file GIT DO Excel...");
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
+      const { cns, so } = parseGitDoExcelWorkbook(wb);
+      DB.gitdoCns = cns;
+      DB.gitdoSo = so;
+      setUploadStatus("gitdoexcel", `<b>${file.name}</b><br>Inbound: ${fmtInt(cns.length)} baris • Star Outlet: ${fmtInt(so.length)} baris`, true);
+      renderGitDo();
+      showToast(`Berhasil memuat ${file.name}`, "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Gagal memproses file GIT DO Excel: " + err.message, "error");
+    } finally { hideProgress(); }
+  };
+  reader.onerror = () => { hideProgress(); showToast("Gagal membaca file.", "error"); };
+  reader.readAsArrayBuffer(file);
+}
+function gitDoActiveRows() {
+  if (gitDoFilter.tab === "cns") return DB.gitdoCns;
+  if (gitDoFilter.tab === "so") return DB.gitdoSo;
+  return DB.gitdoSap;
+}
+function gitDoTabLabel() {
+  if (gitDoFilter.tab === "cns") return "Inbound";
+  if (gitDoFilter.tab === "so") return "Star Outlet";
+  return "Tarikan SAP";
+}
+function gitDoUploadHintLabel() {
+  return gitDoFilter.tab === "sap" ? "GIT DO SAP (Tarikan SAP)" : "GIT DO Excel (Pivot CNS & Pivot SO)";
+}
+// Filter GIT DO -- CAMPURAN dropdown ala Excel autofilter (match persis)
+// utk field ber-kategori jelas, & kotak ketik (substring, mirip search
+// bebas) utk field yg nilainya terlalu banyak/unik utk didaftar sbg
+// dropdown (SKU ID, SKU Name, No DO) -- sesuai permintaan user. Field yg
+// tersedia beda per tab: "Tarikan SAP" tdk punya ROM/ID GAB Name (itu cuma
+// ada di 2 sheet Pivot), sementara Inbound/Star Outlet tdk punya SKU ID/
+// SKU Name (data pivot itu level shipment, bukan per-SKU).
+function gitDoFilterFieldsForTab() {
+  return gitDoFilter.tab === "sap"
+    ? [
+        { key: "divisi", label: "Divisi", type: "select" },
+        { key: "skuId", label: "SKU ID", type: "text" },
+        { key: "skuName", label: "SKU Name", type: "text" },
+      ]
+    : [
+        { key: "rom", label: "ROM", type: "select" },
+        { key: "idGabName", label: "ID GAB Name", type: "select" },
+        { key: "divisi", label: "Divisi", type: "select" },
+        { key: "noDo", label: "No DO", type: "text" },
+      ];
+}
+// Cocokkan 1 baris thd 1 filter field -- dropdown ("select") harus PERSIS
+// sama, kotak ketik ("text") cukup MENGANDUNG kata kunci (case-insensitive,
+// spt search bebas).
+function gitDoMatchField(r, f, val) {
+  if (!val) return true;
+  const cell = String(r[f.key] ?? "");
+  return f.type === "text" ? cell.toLowerCase().includes(val.toLowerCase()) : cell === val;
+}
+// Opsi dropdown utk 1 field SELECT dihitung dari baris yg SUDAH disempitkan
+// oleh filter field LAIN yg sedang aktif (baik dropdown maupun kotak ketik,
+// tapi bukan field itu sendiri) -- ala Excel autofilter: daftar pilihan
+// ikut menyempit mengikuti filter lain yg sudah dipilih/diketik, tapi field
+// itu sendiri tetap bisa diganti bebas ke opsi lain.
+function gitDoFilterOptions(allRows, fields, excludeKey) {
+  const base = fields.filter(f => f.key !== excludeKey).reduce((rows, f) => {
+    const val = gitDoFilters[f.key];
+    if (!val) return rows;
+    return rows.filter(r => gitDoMatchField(r, f, val));
+  }, allRows);
+  const set = new Set();
+  base.forEach(r => { const v = r[excludeKey]; if (v !== undefined && v !== null && v !== "") set.add(String(v)); });
+  return Array.from(set).sort((a, b) => a.localeCompare(b, "id"));
+}
+// Reset defensif -- HANYA utk field dropdown ("select"): kalau kombinasi
+// filter lain membuat suatu pilihan yg sedang aktif jadi tidak ada datanya
+// lagi (atau field tsb tdk relevan lagi krn ganti tab), kosongkan filter
+// itu. Field kotak ketik ("text") sengaja TIDAK direset otomatis -- kata
+// kunci yg tak ketemu hasil ya wajar tampil "tidak ada data cocok", sama
+// spt search bebas sebelumnya.
+function gitDoValidateFilters(allRows) {
+  const fields = gitDoFilterFieldsForTab();
+  const activeKeys = new Set(fields.map(f => f.key));
+  Object.keys(gitDoFilters).forEach(k => { if (!activeKeys.has(k)) gitDoFilters[k] = ""; });
+  fields.forEach(f => {
+    if (f.type !== "select") return;
+    const val = gitDoFilters[f.key];
+    if (!val) return;
+    if (!gitDoFilterOptions(allRows, fields, f.key).includes(val)) gitDoFilters[f.key] = "";
+  });
+}
+function renderGitDoFilterBar(allRows) {
+  const bar = document.getElementById("gitDoFilterBar");
+  if (!bar) return;
+  const fields = gitDoFilterFieldsForTab();
+  // Jaga fokus & posisi kursor kotak ketik yg sedang diisi user -- bar ini
+  // dibangun ulang (innerHTML) tiap render (perlu, krn opsi dropdown lain
+  // ikut menyempit/berubah), yg tanpa ini akan bikin fokus hilang begitu
+  // debounce mengetik selesai & re-render jalan.
+  const active = document.activeElement;
+  const activeField = (active && active.matches && active.matches("[data-gitdo-filter-field]"))
+    ? active.getAttribute("data-gitdo-filter-field") : null;
+  const selStart = (activeField && "selectionStart" in active) ? active.selectionStart : null;
+  bar.innerHTML = fields.map(f => {
+    const current = gitDoFilters[f.key] || "";
+    if (f.type === "text") {
+      return `<div class="field" style="min-width:160px; margin:0;">
+        <label>${f.label}</label>
+        <input type="text" class="gitdo-filter-input" data-gitdo-filter-field="${f.key}" value="${current.replace(/"/g, "&quot;")}" placeholder="Ketik ${f.label}...">
+      </div>`;
+    }
+    const opts = gitDoFilterOptions(allRows, fields, f.key);
+    const optionsHtml = opts.map(v => `<option value="${v.replace(/"/g, "&quot;")}"${v === current ? " selected" : ""}>${v}</option>`).join("");
+    return `<div class="field" style="min-width:150px; margin:0;">
+      <label>${f.label}</label>
+      <select class="mode-select gitdo-filter-select" data-gitdo-filter-field="${f.key}">
+        <option value=""${current ? "" : " selected"}>Semua</option>
+        ${optionsHtml}
+      </select>
+    </div>`;
+  }).join("");
+  if (activeField) {
+    const el = bar.querySelector(`[data-gitdo-filter-field="${activeField}"]`);
+    if (el && el.tagName === "INPUT") {
+      el.focus();
+      if (selStart != null && el.setSelectionRange) { try { el.setSelectionRange(selStart, selStart); } catch (e) { /* noop */ } }
+    }
+  }
+}
+function gitDoApplyFilters(rows) {
+  const fields = gitDoFilterFieldsForTab();
+  return fields.reduce((acc, f) => {
+    const val = gitDoFilters[f.key];
+    if (!val) return acc;
+    return acc.filter(r => gitDoMatchField(r, f, val));
+  }, rows);
+}
+/* Ringkasan di atas breadcrumb/search -- "Jumlah DO" (No DO UNIK, krn 1 DO
+   biasa punya banyak baris/SKU) & "Jumlah Karton"/"Jumlah Qty" (jumlah dari
+   kolom Qty GIT / Total, mengikuti tab yg aktif) -- dihitung dari data yg
+   SEDANG TAMPIL (setelah drill klik-cell + search digabung), bukan dari
+   seluruh dataset, supaya angkanya selalu sesuai apa yg dilihat user. */
+function renderGitDoSummary(rows) {
+  const el = document.getElementById("gitDoSummary");
+  if (!el) return;
+  const doSet = new Set();
+  let qtySum = 0;
+  rows.forEach(r => { if (r.noDo) doSet.add(r.noDo); qtySum += (r.qty || 0); });
+  const qtyLabel = gitDoFilter.tab === "sap" ? "Jumlah Karton (Qty GIT)" : "Jumlah Qty (Total)";
+  el.innerHTML = `
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("truck")}</div>
+      <div class="body"><div class="label">Jumlah DO (No DO Unik)</div><div class="value">${fmtInt(doSet.size)}</div></div>
+    </div>
+    <div class="card kpi-card">
+      <div class="icon-circle">${ico("box")}</div>
+      <div class="body"><div class="label">${qtyLabel}</div><div class="value">${fmtNum(qtySum, 0)}</div></div>
+    </div>`;
+}
+/* Markup <thead>/<tr> tabel GIT DO -- dipakai bersama oleh render (jendela
+   virtual) & export Excel (tabel penuh), supaya kolomnya TIDAK PERNAH bisa
+   beda antara yg ditampilkan dan yg diexport. */
+function gitDoTheadHtml() {
+  if (gitDoFilter.tab === "sap") {
+    return `<tr>
+      <th>No</th><th>Kode Sales</th><th>Nama Sales</th><th>No DO</th><th>Code S.T.P</th>
+      <th>Ship To Party</th><th>Divisi</th><th>Tgl DO</th><th>Tgl GI</th><th>SKU ID</th><th>SKU Name</th>
+      <th style="text-align:right;">Qty GIT</th><th>UOM</th><th>ETA</th>
+    </tr>`;
+  }
+  return `<tr>
+    <th>No</th><th>Tgl GI</th><th>ROM</th><th>ID GAB</th><th>ID GAB Name</th><th>Code S.T.P</th>
+    <th>Ship To Party</th><th>Shipment</th><th>Ekspedisi</th><th>Nopol</th><th>No DO</th>
+    <th>Divisi</th><th>ETA</th><th style="text-align:right;">Total (Qty)</th>
+  </tr>`;
+}
+function gitDoColumnCount() {
+  return (gitDoTheadHtml().match(/<th/g) || []).length;
+}
+function gitDoRowHtml(r, i) {
+  if (gitDoFilter.tab === "sap") {
+    return `<tr>
+      <td>${i + 1}</td><td>${r.salesCode || "-"}</td><td>${r.salesName || "-"}</td>
+      <td>${r.noDo || "-"}</td><td>${r.codeStp || "-"}</td><td>${r.shipToParty || "-"}</td>
+      <td>${r.divisi || "-"}</td>
+      <td>${r.tglDo ? fmtDateID(r.tglDo) : "-"}</td><td>${r.tglGi ? fmtDateID(r.tglGi) : "-"}</td>
+      <td>${r.skuId || "-"}</td><td>${r.skuName || "-"}</td>
+      <td style="text-align:right;">${fmtNum(r.qty, 0)}</td><td>${r.uom || "-"}</td>
+      <td>${r.eta ? fmtDateID(r.eta) : "-"}</td>
+    </tr>`;
+  }
+  return `<tr>
+    <td>${i + 1}</td><td>${r.tglGi ? fmtDateID(r.tglGi) : "-"}</td><td>${r.rom || "-"}</td>
+    <td>${r.idGab || "-"}</td><td>${r.idGabName || "-"}</td><td>${r.codeStp || "-"}</td>
+    <td>${r.shipToParty || "-"}</td><td>${r.shipment || "-"}</td><td>${r.ekspedisi || "-"}</td>
+    <td>${r.nopol || "-"}</td><td>${r.noDo || "-"}</td>
+    <td>${r.divisi || "-"}</td>
+    <td>${r.eta ? fmtDateID(r.eta) : "-"}</td>
+    <td style="text-align:right;">${fmtNum(r.qty, 0)}</td>
+  </tr>`;
+}
+/* ---- Virtualisasi baris tabel GIT DO ----
+   Tab Inbound/Star Outlet bisa berisi ribuan baris (Pivot CNS/SO nyata: sampai
+   ~3900 baris). Awalnya semua baris itu dirender sekaligus ke DOM (dibatasi
+   HARD_CAP=3000) -- diukur scroll-nya jadi SANGAT patah2 (turun ke ~10-15fps
+   dari normalnya 60fps, makin banyak baris makin parah & kira2 linear thd
+   jumlah baris). Sempat dicoba content-visibility:auto pd <tr>, TAPI TIDAK
+   BERPENGARUH SAMA SEKALI -- spec CSS Containment secara eksplisit MELARANG
+   containment (yg jadi dasar content-visibility) pada elemen tabel internal
+   (table-row/table-cell/dst), jadi trik yg dipakai di tempat lain pada
+   dashboard ini (content-visibility utk ribbon yg sedang tak dilihat) TIDAK
+   bisa dipakai di sini.
+   Solusi yg benar2 terbukti (diuji lewat pengukuran frame demi frame):
+   HANYA baris yg sedang/segera terlihat yg benar2 ada di DOM (+ buffer
+   sedikit di atas/bawah), sisanya direpresentasikan oleh 1 baris "spacer"
+   kosong di atas & 1 di bawah (tinggi totalnya = jumlah baris yg disembunyikan
+   x taksiran tinggi 1 baris) -- supaya tinggi & posisi scrollbar tetap
+   seolah SEMUA baris ada, dan user tetap bisa scroll menjelajahi seluruh
+   data (TIDAK ADA lagi baris yg "dipotong"/harus mempersempit pencarian dulu
+   spt sebelumnya), browser hanya perlu meng-layout/paint segelintir baris
+   kapan pun. Hasil pengukuran: dari ~55ms/frame (jank parah) turun ke
+   ~16-17ms/frame (60fps mulus) pd 3884 baris. */
+let gitDoVirtualRows = [];
+let gitDoVirtualRowH = 37; // px, taksiran awal -- dikalibrasi ulang dari baris nyata pertama yg dirender
+let gitDoVirtualRange = { start: -1, end: -1 };
+const GITDO_VIRTUAL_BUFFER = 12; // baris tambahan di atas/bawah viewport, spy scroll cepat tak sempat "kehabisan" baris
+function gitDoRenderVirtualWindow(force, _recalibrating) {
+  const wrap = document.getElementById("gitDoTableWrap");
+  const tbody = document.getElementById("gitDoVirtualBody");
+  if (!wrap || !tbody) return;
+  const rows = gitDoVirtualRows;
+  const total = rows.length;
+  if (total === 0) { tbody.innerHTML = ""; return; }
+  const rowH = gitDoVirtualRowH;
+  const viewportRows = Math.max(1, Math.ceil((wrap.clientHeight || 600) / rowH));
+  // PENTING: klem "start" supaya TIDAK PERNAH melebihi total-1. Taksiran
+  // tinggi baris (rowH) dikalibrasi ulang dari baris yg nyata dirender, tapi
+  // tinggi baris asli bisa beda2 cukup jauh antar baris (mis. teks Ship To
+  // Party/ID GAB Name yg panjang & wrap 2 baris vs yg pendek 1 baris).
+  // Tanpa klem ini, kombinasi scrollTop lama (dari tab/rowH sebelumnya) yg
+  // sempat lebih tinggi + rowH yg baru saja terkalibrasi ulang jadi lebih
+  // besar bisa membuat start>total, sehingga start>end dan tabel jadi
+  // kosong (cuma tersisa 1 baris spacer) -- pernah benar2 terjadi & teruji.
+  const maxStart = Math.max(0, total - 1);
+  const start = Math.min(maxStart, Math.max(0, Math.floor(wrap.scrollTop / rowH) - GITDO_VIRTUAL_BUFFER));
+  const end = Math.min(total, start + viewportRows + GITDO_VIRTUAL_BUFFER * 2);
+  if (!force && start === gitDoVirtualRange.start && end === gitDoVirtualRange.end) return;
+  gitDoVirtualRange.start = start; gitDoVirtualRange.end = end;
+  const topH = start * rowH;
+  const botH = (total - end) * rowH;
+  const colspan = gitDoColumnCount();
+  let html = "";
+  if (topH > 0) html += `<tr aria-hidden="true"><td colspan="${colspan}" style="padding:0; border:0; height:${topH}px;"></td></tr>`;
+  for (let i = start; i < end; i++) html += gitDoRowHtml(rows[i], i);
+  if (botH > 0) html += `<tr aria-hidden="true"><td colspan="${colspan}" style="padding:0; border:0; height:${botH}px;"></td></tr>`;
+  tbody.innerHTML = html;
+  // Kalibrasi taksiran tinggi baris dari baris nyata pertama yg benar2
+  // dirender (lebih akurat dr taksiran statis 37px) -- kalau beda jauh,
+  // paksa render ulang SEKALI LAGI dgn window yg sudah dikoreksi.
+  // PENTING: dibatasi maks 1x koreksi per pemanggilan (via flag
+  // _recalibrating) -- beberapa baris (mis. teks Ship To Party/ID GAB Name
+  // yg panjang) bisa wrap jadi 2 baris & tingginya beda2 antar baris, kalau
+  // tak dibatasi ini bisa memicu kalibrasi-ulang tanpa henti (baris sampel
+  // berikutnya kembali beda >2px dari hasil koreksi sebelumnya) sampai
+  // "Maximum call stack size exceeded". Satu kali koreksi sudah cukup utk
+  // bikin taksiran jauh lebih akurat drpd default statis 37px; sisa
+  // variasi kecil antar baris cuma bikin panjang scrollbar sedikit meleset,
+  // bukan error.
+  if (!_recalibrating) {
+    const sample = tbody.querySelector("tr:not([aria-hidden])");
+    if (sample) {
+      const measured = sample.getBoundingClientRect().height;
+      if (measured > 0 && Math.abs(measured - rowH) > 2) {
+        gitDoVirtualRowH = measured;
+        gitDoVirtualRange.start = -1; gitDoVirtualRange.end = -1;
+        gitDoRenderVirtualWindow(true, true);
+      }
+    }
+  }
+}
+let gitDoVirtualScrollWired = false;
+function gitDoWireVirtualScroll() {
+  const wrap = document.getElementById("gitDoTableWrap");
+  if (!wrap || gitDoVirtualScrollWired) return;
+  gitDoVirtualScrollWired = true;
+  // wrap (div-nya sendiri) TIDAK PERNAH diganti antar-render (cuma isinya
+  // via innerHTML), jadi listener ini aman terpasang sekali saja seumur
+  // halaman -- throttle lewat requestAnimationFrame supaya tidak menghitung
+  // ulang window pd SETIAP event scroll (bisa berkali-kali per frame).
+  let ticking = false;
+  wrap.addEventListener("scroll", () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => { gitDoRenderVirtualWindow(false); ticking = false; });
+  }, { passive: true });
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(() => gitDoRenderVirtualWindow(true)).observe(wrap);
+  }
+}
+/* Tabel PENUH (semua baris, tanpa virtualisasi) -- HANYA dipakai saat export
+   Excel (lihat exportTableToExcel), supaya file yg diexport tetap berisi
+   SELURUH data hasil filter, bukan cuma baris yg kebetulan sedang ada di
+   DOM saat itu. */
+function gitDoFullTableHtml(rows) {
+  return `<table><thead>${gitDoTheadHtml()}</thead><tbody>${rows.map((r, i) => gitDoRowHtml(r, i)).join("")}</tbody></table>`;
+}
+function renderGitDoTabs() {
+  document.querySelectorAll(".gitdo-tab-btn").forEach(btn => {
+    const isActive = btn.getAttribute("data-gitdo-tab") === gitDoFilter.tab;
+    btn.classList.toggle("btn-primary", isActive);
+    btn.classList.toggle("btn-ghost", !isActive);
+  });
+}
+function renderGitDoBreadcrumb() {
+  const el = document.getElementById("gitDoBreadcrumb");
+  if (!el) return;
+  el.innerHTML = `<span class="bs-crumb-current">📋 Semua Data — ${gitDoTabLabel()}</span>`;
+}
+function renderGitDo() {
+  renderGitDoTabs();
+  const wrap = document.getElementById("gitDoTableWrap");
+  const countEl = document.getElementById("gitDoCount");
+  if (!wrap) return;
+  const allRows = gitDoActiveRows();
+  if (!allRows.length) {
+    wrap.innerHTML = `<div class="exec-empty">Belum ada data. Silakan upload file ${gitDoUploadHintLabel()} pada halaman Upload Data.</div>`;
+    if (countEl) countEl.textContent = "";
+    const crumbEl = document.getElementById("gitDoBreadcrumb"); if (crumbEl) crumbEl.innerHTML = "";
+    const summaryEl = document.getElementById("gitDoSummary"); if (summaryEl) summaryEl.innerHTML = "";
+    const barEl = document.getElementById("gitDoFilterBar"); if (barEl) barEl.innerHTML = "";
+    return;
+  }
+  renderGitDoBreadcrumb();
+  // Reset defensif dulu (mis. ganti tab, atau upload ulang file dgn data
+  // berbeda membuat pilihan filter yg sedang aktif tak ada datanya lagi),
+  // baru gambar dropdown filter (opsinya menyempit ala Excel autofilter
+  // sesuai filter LAIN yg sedang aktif -- lihat gitDoFilterOptions) dan
+  // terapkan semua filter yg aktif (AND).
+  gitDoValidateFilters(allRows);
+  renderGitDoFilterBar(allRows);
+  const rows = gitDoApplyFilters(allRows);
+  renderGitDoSummary(rows);
+  if (!rows.length) {
+    wrap.innerHTML = '<div class="exec-empty">Tidak ada data yang cocok dengan kombinasi filter yang dipilih.</div>';
+    if (countEl) countEl.textContent = "0 baris";
+    return;
+  }
+  if (countEl) countEl.textContent = `${fmtInt(rows.length)} baris`;
+  // PERFORMA: semua baris tetap bisa di-scroll & dijangkau (sesuai permintaan
+  // "saya hanya ingin semuanya tampil"), tapi yg benar2 di-render ke DOM
+  // cuma sejumlah baris yg terlihat di viewport +buffer ("virtual scrolling"
+  // / windowing). Render >2000-3000 <tr> sekaligus terbukti (via profiling)
+  // jadi penyebab scroll patah-patah/jank; content-visibility:auto TIDAK
+  // bisa dipakai di sini krn spec CSS Containment melarang containment utk
+  // elemen tabel internal (table-row/table-cell dst). Baris kosong "spacer"
+  // di atas & bawah menjaga tinggi scrollbar tetap benar walau isi baris
+  // yg di tengah blm/tdk dirender. Lihat gitDoTheadHtml/gitDoRowHtml/
+  // gitDoRenderVirtualWindow/gitDoWireVirtualScroll di atas.
+  gitDoVirtualRows = rows;
+  gitDoVirtualRange.start = -1; gitDoVirtualRange.end = -1;
+  wrap.innerHTML = `<table class="ar-table prestasi-table">
+    <thead>${gitDoTheadHtml()}</thead>
+    <tbody id="gitDoVirtualBody"></tbody>
+  </table>`;
+  wrap.scrollTop = 0;
+  gitDoWireVirtualScroll();
+  gitDoRenderVirtualWindow(true);
+  // PENTING (performa, lihat wiring event delegation SATU KALI utk klik sel
+  // SKU ID/SKU Name/Divisi di dekat wiring tab GIT DO lainnya -- BUKAN
+  // dipasang ulang di sini setiap render, krn dgn sampai ~3000 baris x 2
+  // kolom yg bisa diklik, addEventListener satu-per-satu tiap tombol/tiap
+  // render akan menumpuk terus & terukur costnya ratusan ms).
+}
+function gitDoSwitchTab(tab) {
+  if (gitDoFilter.tab === tab) return;
+  gitDoFilter.tab = tab;
+  // Reset semua dropdown filter juga -- field yg tersedia beda per tab
+  // (lihat gitDoFilterFieldsForTab()), jadi pilihan lama bisa jadi tidak
+  // relevan lagi (atau membingungkan) kalau dibawa pindah ke tab lain.
+  Object.keys(gitDoFilters).forEach(k => { gitDoFilters[k] = ""; });
+  renderGitDo();
 }
 
 /* ---- Render: Grafik Frekuensi Opname Stock (Plus=hijau garis, Minus=merah garis, Total=kuning batang) ---- */
@@ -16493,6 +17322,7 @@ const RENDER_ALL_ENTRIES = [
   { page: "cutcost", fn: renderCutCostDependent },
   { page: "openitem", fn: renderOpenItemDependent },
   { page: "ediro", fn: renderEdiRoDependent },
+  { page: "gitdo", fn: renderGitDo },
   { page: "qty", fn: () => renderOfrDelivery1("qty", fQty()) },
   { page: "qty", fn: () => renderOfrDelivery2("qty", fQty()) },
   { page: "qty", fn: () => renderOfrGagal("qty", fQty()) },
@@ -16571,6 +17401,8 @@ function handleFile(target, file) {
   if (target === "stockgudang") { handleStockGudangFile(file); return; }
   if (target === "edistock") { handleEdiStockFile(file); return; }
   if (target === "mydex") { handleMydexFile(file); return; }
+  if (target === "gitdosap") { handleGitDoSapFile(file); return; }
+  if (target === "gitdoexcel") { handleGitDoExcelFile(file); return; }
   showProgress("Membaca file...");
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -17438,6 +18270,7 @@ function resetAllData() {
   bsFilter.divisions = new Set(DIVISIONS); bsFilter.periode = new Set();
   bsDim.salesman = "ALL"; bsDim.reason = "ALL"; bsDim.outlet = "ALL";
   bsChannelDrill.channel = null; bsChannelDrill.kodeOutlet = null;
+  omsetWilayahKecChannelDrill.channel = null; omsetWilayahKabChannelDrill.channel = null;
   DB.ar = []; arFilter.divisions = new Set(DIVISIONS); arDetailOpen.top = null; arDetailOpen.overdue = null; arDim.salesman = "ALL"; arModeFilter.value = "";
   arSalesmanShowDetail.value = false;
   const arSalesmanDetailToggleReset = document.getElementById("arSalesmanShowDetailToggle"); if (arSalesmanDetailToggleReset) arSalesmanDetailToggleReset.checked = false;
@@ -17564,6 +18397,12 @@ function resetAllData() {
   const mydexTableTitleReset = document.getElementById("mydexTableTitle"); if (mydexTableTitleReset) mydexTableTitleReset.textContent = "Detail Transaksi per NOPOL / Ritase / Toko";
   const mydexTableDescReset = document.getElementById("mydexTableDesc"); if (mydexTableDescReset) mydexTableDescReset.textContent = "Mengikuti pilihan NOPOL di atas — No RPP, Nama Toko, Channel, Qty, Tunai/Kredit, dan status scan tiap transaksi";
   setUploadStatus("mydex", "Belum ada data", false);
+  DB.gitdoSap = []; DB.gitdoCns = []; DB.gitdoSo = [];
+  gitDoFilter.tab = "sap";
+  Object.keys(gitDoFilters).forEach(k => { gitDoFilters[k] = ""; });
+  const gitDoFilterBarReset = document.getElementById("gitDoFilterBar"); if (gitDoFilterBarReset) gitDoFilterBarReset.innerHTML = "";
+  setUploadStatus("gitdosap", "Belum ada data", false);
+  setUploadStatus("gitdoexcel", "Belum ada data", false);
   buildPnlFilterUI();
   document.querySelectorAll(".pnl-metric-check").forEach(cb => { cb.checked = true; });
   const pnlDetEl = document.getElementById("pnlShowDetailToggle"); if (pnlDetEl) pnlDetEl.checked = false;
@@ -18165,6 +19004,35 @@ function exportTableToExcel(containerId, filenamePrefix) {
       showToast("Gagal export tabel: " + err.message, "error");
     } finally {
       clone.remove();
+    }
+    return;
+  }
+  if (containerId === "gitDoTableWrap") {
+    // Kasus khusus: tabel GIT DO di layar pakai virtual scrolling (lihat
+    // gitDoRenderVirtualWindow) -- hanya sebagian kecil baris yg benar2 ada
+    // di DOM pada satu waktu (sisanya "spacer" kosong). table_to_sheet()
+    // langsung dari DOM di sini akan salah/kurang datanya. Bangun tabel
+    // penuh (SEMUA baris di gitDoVirtualRows, sesuai filter/drill/search yg
+    // sedang aktif) di luar layar khusus utk export, tampilan asli tak
+    // disentuh.
+    if (!gitDoVirtualRows.length) { showToast("Tabel belum ada datanya untuk diexport.", "error"); return; }
+    const temp = document.createElement("div");
+    temp.style.position = "fixed"; temp.style.left = "-9999px"; temp.style.top = "0";
+    temp.innerHTML = gitDoFullTableHtml(gitDoVirtualRows);
+    document.body.appendChild(temp);
+    try {
+      const table = temp.querySelector("table");
+      const ws = XLSX.utils.table_to_sheet(table, { raw: false });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Data");
+      const stamp = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `${filenamePrefix}_${stamp}.xlsx`);
+      showToast("Tabel berhasil diexport ke Excel.", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Gagal export tabel: " + err.message, "error");
+    } finally {
+      temp.remove();
     }
     return;
   }
@@ -20058,11 +20926,52 @@ function init() {
   });
   // ---- Wiring 3 widget baru "Omset -- Wilayah, Toko/Pcode & Channel" ----
   const omsetWilayahKecSel = document.getElementById("omsetWilayahKecamatanSelect");
-  if (omsetWilayahKecSel) omsetWilayahKecSel.addEventListener("change", renderOmsetWilayah);
+  if (omsetWilayahKecSel) omsetWilayahKecSel.addEventListener("change", () => {
+    // Reset drill Channel setiap kali Kecamatan yg dipilih berganti -- supaya
+    // tidak "nyangkut" di channel Kecamatan sebelumnya yg kebetulan nama
+    // channel-nya sama.
+    omsetWilayahKecChannelDrill.channel = null;
+    renderOmsetWilayah();
+  });
   const omsetWilayahKabSel = document.getElementById("omsetWilayahKabupatenSelect");
-  if (omsetWilayahKabSel) omsetWilayahKabSel.addEventListener("change", renderOmsetWilayah);
+  if (omsetWilayahKabSel) omsetWilayahKabSel.addEventListener("change", () => {
+    omsetWilayahKabChannelDrill.channel = null;
+    renderOmsetWilayah();
+  });
   const omsetWilayahSearchInputEl = document.getElementById("omsetWilayahSearchInput");
   if (omsetWilayahSearchInputEl) omsetWilayahSearchInputEl.addEventListener("input", applyOmsetWilayahSearch);
+  document.querySelectorAll(".gitdo-tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => gitDoSwitchTab(btn.getAttribute("data-gitdo-tab")));
+  });
+  // Event delegation SATU KALI utk filter GIT DO -- campuran dropdown
+  // (ROM/ID GAB Name/Divisi) & kotak ketik (SKU ID/SKU Name/No DO) -- bar-
+  // nya sendiri TIDAK pernah diganti (cuma isinya via innerHTML tiap
+  // render), jadi listener ini aman terpasang sekali saja seumur halaman,
+  // walau elemen <select>/<input> di dalamnya dibuat ulang tiap
+  // renderGitDoFilterBar().
+  const gitDoFilterBarEl = document.getElementById("gitDoFilterBar");
+  if (gitDoFilterBarEl) {
+    gitDoFilterBarEl.addEventListener("change", (e) => {
+      const sel = e.target.closest("select[data-gitdo-filter-field]");
+      if (!sel) return;
+      gitDoFilters[sel.getAttribute("data-gitdo-filter-field")] = sel.value;
+      renderGitDo();
+    });
+    // Debounce 350ms, sama seperti kotak search lain di dashboard ini --
+    // kotak ketik SKU ID/SKU Name/No DO substring-match (bukan dropdown).
+    let gitDoFilterTextDebounce = null;
+    gitDoFilterBarEl.addEventListener("input", (e) => {
+      const inp = e.target.closest("input[data-gitdo-filter-field]");
+      if (!inp) return;
+      const field = inp.getAttribute("data-gitdo-filter-field");
+      const val = inp.value;
+      clearTimeout(gitDoFilterTextDebounce);
+      gitDoFilterTextDebounce = setTimeout(() => {
+        gitDoFilters[field] = val;
+        renderGitDo();
+      }, 350);
+    });
+  }
   const omsetSearchInputEl = document.getElementById("omsetSearchInput");
   if (omsetSearchInputEl) {
     // Debounce 350ms, sama seperti "Cari PCode" di EDI RO.

@@ -6071,7 +6071,16 @@ if (typeof Chart !== "undefined") { Chart.register(ccyAlwaysLabelPlugin); }
    ========================================================================= */
 function num(s) {
   if (s === undefined || s === null) return 0;
-  const v = parseFloat(String(s).trim().replace(/,/g, ""));
+  // PENTING (konsisten dgn bug EDI RO yg pernah ditemukan -- lihat
+  // buildEdiRoRowFromCols): sebagian format file export membungkus SEMUA
+  // kolom teks, TERMASUK yg isinya angka, dgn tanda kutip dua (mis. nilai
+  // 99999 tertulis literal sbg `"99999"`). parseFloat() berhenti di
+  // karakter non-angka PERTAMA, jadi tanda kutip pembuka langsung bikin
+  // hasilnya NaN -> 0, walau datanya sebenarnya valid & bukan nol. Buang
+  // dulu kutip pembungkus (kalau ada) sebelum parseFloat -- aman dipanggil
+  // pada string yg memang sudah bersih (tanpa kutip), tidak mengubah hasil
+  // apapun utknya, jadi tidak merusak parser lain yg sudah benar.
+  const v = parseFloat(String(s).trim().replace(/^"|"$/g, "").trim().replace(/,/g, ""));
   return Number.isFinite(v) ? v : 0;
 }
 function fmtInt(n) { n = Number(n); return Number.isFinite(n) ? Math.round(n).toLocaleString("id-ID") : "0"; }
@@ -6407,7 +6416,10 @@ function inboundProcessByPeriod(rows, mode) {
 function parseEPE(text) {
   const lines = text.split(/\r\n|\r|\n/).filter(l => l.trim().length > 0);
   if (!lines.length) throw new Error("File EPE kosong.");
-  const header = lines[0].split("|").map(s => s.trim());
+  // PENTING: pakai unq() (bukan cuma .trim()) spt parser EDI RO -- kalau
+  // header ikut dibungkus kutip dua (format export lain/masa depan), idx()
+  // di bawah tetap bisa cocok dgn nama kolom (STATUS AKTIF dkk).
+  const header = lines[0].split("|").map(s => unq(s));
   const idx = name => header.indexOf(name);
 
   const iDate = idx("TANGGAL");
@@ -6427,19 +6439,19 @@ function parseEPE(text) {
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split("|");
     if (cols.length < 10) continue;
-    const dt = parseIndoDate(cols[iDate]);
+    const dt = parseIndoDate(unq(cols[iDate]));
     if (!dt) continue;
-    const vehicle = (cols[iVeh] || "").trim();
+    const vehicle = unq(cols[iVeh]);
     if (!vehicle) continue;
     rows.push({
       date: dt,
       vehicle: vehicle,
-      jenisKendaraan: iJnsKend >= 0 ? (cols[iJnsKend] || "").trim() : "",
+      jenisKendaraan: iJnsKend >= 0 ? unq(cols[iJnsKend]) : "",
       rit1: iRit1 >= 0 ? num(cols[iRit1]) : 0,
       rit2: iRit2 >= 0 ? num(cols[iRit2]) : 0,
       rit3: iRit3 >= 0 ? num(cols[iRit3]) : 0,
       epe: num(cols[iEpe]),
-      status: iStatus >= 0 ? (cols[iStatus] || "").trim() : ""
+      status: iStatus >= 0 ? unq(cols[iStatus]) : ""
     });
   }
   if (!rows.length) throw new Error("Tidak ada baris data valid ditemukan di file EPE.");
@@ -8028,6 +8040,21 @@ function ediRoResolveColumns(header) {
 // satu baris grid dari SheetJS) + hasil resolusi kolom (C) + interner string
 // (utk kurangi duplikasi memori pada field yg banyak berulang, mis. nama
 // salesman/customer/produk). Dipakai bareng oleh parseEdiRoText & parseEdiRoGrid.
+// BUG SERIUS YANG PERNAH ADA DI SINI (SUDAH DIPERBAIKI): versi sebelumnya
+// mengirim cols[...] LANGSUNG ke intern() tanpa lewat unq() dulu. File EDI
+// QTY RO asli (export sistem) ternyata membungkus SEMUA kolom teks dengan
+// tanda kutip dua, mis. CARNO -> `"D8197FE"`, STATUS -> `"1"`, PCODE ->
+// `"351205"` (sudah dicek langsung di file contoh user). intern() HANYA
+// trim(), TIDAK membuang tanda kutip spt unq() -- akibatnya field2 itu
+// tersimpan dgn tanda kutip menempel (mis. status jadi string `"1"` 3
+// karakter, BUKAN `1`). Ini bikin SEMUA perbandingan persis spt
+// `r.status === "1"` di seluruh dashboard (OFR Outlet, OFR Qty, 10 PCode
+// Fast/Non-Fast Moving, tabel Gagal, breakdown per-nopol) GAGAL TOTAL
+// (selalu kosong/nol), dan field spt nopol/PCode/nama Salesman/Customer
+// tampil dgn tanda kutip menempel di tabel ("analisis nopol" dkk terlihat
+// "tidak terbaca"). Fix: SELALU unq() dulu baru intern() utk tiap field
+// teks -- unq() sendiri aman dipanggil dobel/pada string yg memang sudah
+// bersih (tanpa kutip), jadi tidak merusak file yg TIDAK memakai kutip.
 function buildEdiRoRowFromCols(cols, C, intern) {
   if (cols.length <= C.iStatus) return null;
   const date = unq(cols[C.iDate]);
@@ -8038,19 +8065,19 @@ function buildEdiRoRowFromCols(cols, C, intern) {
   const sbra2Raw = C.iSbra2 >= 0 ? unq(cols[C.iSbra2]) : "";
   return {
     date,
-    vehicle: intern(cols[C.iCar]),
-    jenisKendaraan: C.iJnsKend >= 0 ? intern(cols[C.iJnsKend]) : "",
-    ritase: intern(cols[C.iRitase]),
+    vehicle: intern(unq(cols[C.iCar])),
+    jenisKendaraan: C.iJnsKend >= 0 ? intern(unq(cols[C.iJnsKend])) : "",
+    ritase: intern(unq(cols[C.iRitase])),
     orderNo: unq(cols[C.iOrder]),
-    status: intern(cols[C.iStatus]),
-    alasan: C.iAlasan >= 0 ? intern(cols[C.iAlasan]) : "",
-    custNo: C.iCustNo >= 0 ? intern(cols[C.iCustNo]) : "",
-    custName: C.iCustName >= 0 ? intern(cols[C.iCustName]) : "",
-    salesman: C.iSls >= 0 ? intern(cols[C.iSls]) : "",
-    pcode: C.iPcode >= 0 ? intern(cols[C.iPcode]) : "",
-    pcodeName: C.iPcodeName >= 0 ? intern(cols[C.iPcodeName]) : "",
+    status: intern(unq(cols[C.iStatus])),
+    alasan: C.iAlasan >= 0 ? intern(unq(cols[C.iAlasan])) : "",
+    custNo: C.iCustNo >= 0 ? intern(unq(cols[C.iCustNo])) : "",
+    custName: C.iCustName >= 0 ? intern(unq(cols[C.iCustName])) : "",
+    salesman: C.iSls >= 0 ? intern(unq(cols[C.iSls])) : "",
+    pcode: C.iPcode >= 0 ? intern(unq(cols[C.iPcode])) : "",
+    pcodeName: C.iPcodeName >= 0 ? intern(unq(cols[C.iPcodeName])) : "",
     qty: C.iQty >= 0 ? (parseFloat(unq(cols[C.iQty])) || 0) : 0,
-    slsNo: C.iSlsNo >= 0 ? intern(cols[C.iSlsNo]) : "",
+    slsNo: C.iSlsNo >= 0 ? intern(unq(cols[C.iSlsNo])) : "",
     orgQty: C.iOrgQty >= 0 ? (parseFloat(unq(cols[C.iOrgQty])) || 0) : 0,
     convUnit3: C.iConvUnit3 >= 0 ? (parseFloat(unq(cols[C.iConvUnit3])) || 0) : 0,
     divCode: intern(sbra2Raw),
@@ -8058,7 +8085,7 @@ function buildEdiRoRowFromCols(cols, C, intern) {
     divisi3: C.iSbra2 >= 0 ? inboundDiv3(sbra2Raw) : "LAINNYA",
     invRo: C.iInvRo >= 0 ? unq(cols[C.iInvRo]) : "",
     invJual: C.iInvJual >= 0 ? unq(cols[C.iInvJual]) : "",
-    recapNo: C.iRecapNo >= 0 ? intern(cols[C.iRecapNo]) : ""
+    recapNo: C.iRecapNo >= 0 ? intern(unq(cols[C.iRecapNo])) : ""
   };
 }
 // PENTING (performa file besar): versi lama split() pakai regex
@@ -11304,6 +11331,30 @@ function styledOpts(extra) {
   return out;
 }
 
+/* Helper dipakai di chart batang horizontal (indexAxis:"y") yg label
+   sumbu-Y-nya gabungan kode+nama (mis. "351504 — LE MINERALE PROMO GOSOK
+   24BTLX600ML", dipakai di 10 PCode Fast/Non-Fast Moving EDI RO & Top 20
+   SCD/Average Sales Stock). BUG YG DITEMUKAN SAAT AUDIT: kalau teks label
+   lebih panjang dari lebar area yg dihitung Chart.js, Chart.js meng-clip
+   teks tsb dari SISI KIRI (krn label sumbu-Y dirender rata-kanan menempel
+   sumbu), sehingga justru kode di AWAL teks (bagian paling penting utk
+   identifikasi produk) yg hilang duluan -- mis. "351504 — LE MINERALE..."
+   bisa tampil terpotong jadi "i — TORACAFE..." (digit kode pertama lenyap
+   begitu saja, tanpa elipsis/tanda apapun, kelihatan spt data rusak).
+   Fix: potong SENDIRI label yg kepanjangan dari BELAKANG (tambah "…"),
+   supaya kode di awal selalu utuh & hasil potongan konsisten/terkendali.
+   Tooltip saat hover tetap menampilkan teks ASLI lengkap (title tooltip
+   Chart.js mengambil dari data.labels asli, bukan dari hasil callback
+   ticks ini). */
+function truncateYTick(maxLen) {
+  maxLen = maxLen || 32;
+  return function (value) {
+    const label = this.getLabelForValue(value);
+    if (typeof label !== "string" || label.length <= maxLen) return label;
+    return label.slice(0, maxLen - 1) + "…";
+  };
+}
+
 /* =========================================================================
    DETAIL GENERIK PER GRAFIK -- checkbox kecil "Detail" pada tiap chart
    (kecuali ribbon Home) yang menampilkan tabel baris data mentah di bawah
@@ -13950,7 +14001,7 @@ function renderEroFastMovingChart() {
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${fmtNum(ctx.parsed.x, 2)} karton` } } },
       scales: {
         x: { ticks: { color: textColor(), font: { size: 10 } }, grid: { color: gridColor() }, beginAtZero: true },
-        y: { ticks: { color: textColor(), font: { size: 9 } }, grid: { display: false } }
+        y: { ticks: { color: textColor(), font: { size: 9 }, callback: truncateYTick(32) }, grid: { display: false } }
       }
     })
   });
@@ -13971,7 +14022,7 @@ function renderEroNonFastMovingChart() {
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${fmtNum(ctx.parsed.x, 2)} karton` } } },
       scales: {
         x: { ticks: { color: textColor(), font: { size: 10 } }, grid: { color: gridColor() }, beginAtZero: true },
-        y: { ticks: { color: textColor(), font: { size: 9 } }, grid: { display: false } }
+        y: { ticks: { color: textColor(), font: { size: 9 }, callback: truncateYTick(32) }, grid: { display: false } }
       }
     })
   });
@@ -14809,7 +14860,7 @@ function renderStockTop20ScdChart(mode) {
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${fmtNum(ctx.parsed.x, 1)} hari` } } },
       scales: {
         x: { ticks: { color: textColor(), font: { size: 10 } }, grid: { color: gridColor() }, beginAtZero: true },
-        y: { ticks: { color: textColor(), font: { size: 9 } }, grid: { display: false } }
+        y: { ticks: { color: textColor(), font: { size: 9 }, callback: truncateYTick(32) }, grid: { display: false } }
       }
     })
   });
@@ -14831,7 +14882,7 @@ function renderStockTop20AvgChart(mode) {
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${fmtNum(ctx.parsed.x, 2)}` } } },
       scales: {
         x: { ticks: { color: textColor(), font: { size: 10 } }, grid: { color: gridColor() }, beginAtZero: true },
-        y: { ticks: { color: textColor(), font: { size: 9 } }, grid: { display: false } }
+        y: { ticks: { color: textColor(), font: { size: 9 }, callback: truncateYTick(32) }, grid: { display: false } }
       }
     })
   });
@@ -15276,7 +15327,7 @@ function renderInboundMaterialTop10Chart(mode) {
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${fmtInt(ctx.parsed.x)} karton` } } },
       scales: {
         x: { ticks: { color: textColor(), font: { size: 10 } }, grid: { color: gridColor() }, beginAtZero: true },
-        y: { ticks: { color: textColor(), font: { size: 9 } }, grid: { display: false } }
+        y: { ticks: { color: textColor(), font: { size: 9 }, callback: truncateYTick(32) }, grid: { display: false } }
       }
     })
   });
